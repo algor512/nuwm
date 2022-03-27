@@ -1,61 +1,37 @@
-CATWM
-=====
+# NUWM - Nu's Window Manager
 
-     /\___/\
-    ( o   o )  Made by cat...
-    (  =^=  )
-    (        )            ... for cat!
-    (         )
-    (          ))))))________________ Cute And Tiny Window Manager
+## Summary
 
-Summary
--------
+`nuwm` is a small dynamic window manager for X forked from [catwm](https://github.com/pyknite/catwm).
 
-catwm is a very simple and lightweight tiling window manager.
-I will try to stay under 1000 SLOC.
+## Modes
 
-Status
-------
- 
- * 05.07.19 -> v0.3. Multiple desktops and correct some bugs
- * 30.06.10 -> v0.2. Back again \o/
- * 15.03.10 -> v0.2. The wm is functional -> I only use this wm!
- * 24.02.10 -> First release, v0.1. In this release 0.1, the wm is almost functional
+Tiling
+```
+--------------
+|        |___|
+|        |___|
+| Master |___|
+|        |___|
+|        |___|
+--------------
+```
+and monocle mode.
 
-Modes
------
+## Installation
 
-It allow the "normal" modes of tiling window managers:
+After making your changes in `config.h`:
 
-    --------------
-    |        |___|
-    |        |___|
-    | Master |___|
-    |        |___|
-    |        |___|
-    --------------
+```
+$ make
+# make install
+```
 
-and fullscreen mode
+By default `nuwm` is installed to `/usr/local/bin`. You can change this in the `Makefile`.
 
-There is no horizontal stack because I never use it. But if someone is interested in, it's very easy to add.
+## Todo
 
-Installation
-------------
-
-Need Xlib, then:
-    $ vim config.h
-    $ make
-    # make install
-    $ make clean
-
-Bugs
-----
- * No bugs for the moment ;) (I mean, no importants bugs ;)
-
-Todo
-----
- * Add multiple view ("desktop")
- * Switch to XCB
-
-If you have some particular request, just send me an e-mail, and I will see for it!
-
+- Log desktop info to stdout to be used by bars that work with stdin
+- Multiple desktop view
+- Window rules
+- Increase/decrease number of master windows
