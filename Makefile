@@ -20,7 +20,9 @@ nuwm: ${OBJ}
 	${CC} -o $@ ${OBJ} ${LDFLAGS}
 
 install: all
-	install -Dm 755 nuwm ${DESTDIR}${BINDIR}/nuwm
+	mkdir -p ${DESTDIR}${PREFIX}/bin
+	cp -f nuwm ${DESTDIR}${PREFIX}/bin
+	chmod 755 ${DESTDIR}${PREFIX}/bin/nuwm
 
 clean:
-	rm -f nuwm *.o
+	rm -f nuwm ${OBJ}
