@@ -1,4 +1,4 @@
-# NUWM - Nu's Window Manager
+# nuwm - Nu's Window Manager
 
 ## Summary
 
