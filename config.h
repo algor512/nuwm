@@ -4,9 +4,10 @@
 #define MOD          Mod4Mask // Mod (Mod1 == alt, Mod4 == super)
 #define MASTER_SIZE  0.55     // default master size
 
-// Colors
+// Border colors and width
 #define FOCUS   "rgb:bc/57/66"
 #define UNFOCUS "rgb:88/88/88"
+#define BORDER  2
 
 const char* dmenucmd[] = { "dmenu_run", NULL };
 const char* termcmd[]  = { "st", NULL };

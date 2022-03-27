@@ -483,11 +483,11 @@ void setup()
 
     // Screen and root window
     screen = DefaultScreen(dis);
-    root = RootWindow(dis,screen);
+    root = RootWindow(dis, screen);
 
     // Screen width and height
-    sw = XDisplayWidth(dis,screen);
-    sh = XDisplayHeight(dis,screen);
+    sw = XDisplayWidth(dis, screen);
+    sh = XDisplayHeight(dis, screen);
 
     // Colors
     win_focus = getcolor(FOCUS);
@@ -620,7 +620,7 @@ void update_current()
     for (c = head; c; c = c->next)
         if (current == c) {
             // "Enable" current window
-            XSetWindowBorderWidth(dis, c->win, 1);
+            XSetWindowBorderWidth(dis, c->win, BORDER);
             XSetWindowBorder(dis, c->win, win_focus);
             XSetInputFocus(dis, c->win, RevertToParent, CurrentTime);
             XRaiseWindow(dis, c->win);
