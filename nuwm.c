@@ -487,7 +487,9 @@ void setup()
     // Error handling
 	xerrorxlib = XSetErrorHandler(xerrorstart);
 	XSelectInput(dis, DefaultRootWindow(dis), SubstructureRedirectMask);
+	XSync(dis, False);
 	XSetErrorHandler(xerror);
+	XSync(dis, False);
 
     // Install a signal
     sigchld(0);
