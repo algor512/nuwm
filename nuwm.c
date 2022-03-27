@@ -22,6 +22,7 @@
  */
 
 #include <X11/Xlib.h>
+#include <X11/Xproto.h>
 #include <X11/keysym.h>
 #include <X11/XF86keysym.h>
 #include <stdio.h>
@@ -88,6 +89,9 @@ static void swap_master();
 static void switch_mode();
 static void tile();
 static void update_current();
+static int xerror(Display *dpy, XErrorEvent *ee);
+/* static int xerrordummy(Display *dpy, XErrorEvent *ee); */
+static int xerrorstart(Display *dpy, XErrorEvent *ee);
 
 // Include configuration file (need struct key)
 #include "config.h"
@@ -102,6 +106,7 @@ static int screen, sh, sw;
 static unsigned int win_focus, win_unfocus;
 static Window root;
 static Client *head, *current;
+static int (*xerrorxlib)(Display *, XErrorEvent *);
 
 // Events array
 static void (*events[LASTEvent])(XEvent *e) = {
@@ -479,6 +484,11 @@ void send_kill_signal(Window w)
 
 void setup()
 {
+    // Error handling
+	xerrorxlib = XSetErrorHandler(xerrorstart);
+	XSelectInput(dis, DefaultRootWindow(dis), SubstructureRedirectMask);
+	XSetErrorHandler(xerror);
+
     // Install a signal
     sigchld(0);
 
@@ -637,6 +647,29 @@ void update_current()
             XSetWindowBorder(dis, c->win, win_unfocus);
 }
 
+int xerror(Display *dpy, XErrorEvent *ee)
+{
+    // thx to dwm
+    if (ee->error_code == BadWindow
+            || (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
+            || (ee->request_code == X_PolyText8 && ee->error_code == BadDrawable)
+            || (ee->request_code == X_PolyFillRectangle && ee->error_code == BadDrawable)
+            || (ee->request_code == X_PolySegment && ee->error_code == BadDrawable)
+            || (ee->request_code == X_ConfigureWindow && ee->error_code == BadMatch)
+            || (ee->request_code == X_GrabButton && ee->error_code == BadAccess)
+            || (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
+            || (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
+        return 0;
+    fprintf(stderr, "nuwm: fatal error: request code=%d, error code=%d\n", ee->request_code, ee->error_code);
+    return xerrorxlib(dpy, ee); /* may call exit */
+}
+
+int xerrorstart(Display *dpy, XErrorEvent *ee)
+{
+    die("Another window manager is already running!");
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     if (!(dis = XOpenDisplay(NULL)))
@@ -645,8 +678,8 @@ int main(int argc, char **argv)
     setup();
 
 #ifdef __OpenBSD__
-	if (pledge("stdio rpath proc exec", NULL) == -1)
-		die("pledge");
+    if (pledge("stdio rpath proc exec", NULL) == -1)
+        die("pledge");
 #endif
 
     start();
