@@ -1,20 +1,26 @@
-CFLAGS+= -Wall
-LDADD+= -lX11 
-LDFLAGS=
-EXEC=catwm
+X11INC = /usr/X11R6/include
+X11LIB = /usr/X11R6/lib
 
-PREFIX?= /usr
-BINDIR?= $(PREFIX)/bin
+INCS = -I${X11INC}
+LIBS = -L${X11LIB} -lX11
 
-CC=gcc
+CFLAGS = -std=c99 -pedantic -Wall -Wno-deprecated-declarations -Os ${INCS}
+LDFLAGS = ${LIBS}
 
-all: $(EXEC)
+PREFIX = /usr/local
+BINDIR = ${PREFIX}/bin
 
-catwm: catwm.o
-	$(CC) $(LDFLAGS) -Os -o $@ $+ $(LDADD)
+CC = cc
+SRC = nuwm.c
+OBJ = ${SRC:.c=.o}
+
+all: nuwm
+
+nuwm: ${OBJ}
+	${CC} -o $@ ${OBJ} ${LDFLAGS}
 
 install: all
-	install -Dm 755 catwm $(DESTDIR)$(BINDIR)/catwm
+	install -Dm 755 nuwm ${DESTDIR}${BINDIR}/nuwm
 
 clean:
-	rm -f catwm *.o
+	rm -f nuwm *.o

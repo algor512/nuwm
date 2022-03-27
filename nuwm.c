@@ -1,13 +1,5 @@
  /*
- *   /\___/\
- *  ( o   o )  Made by cat...
- *  (  =^=  )
- *  (        )            ... for cat!
- *  (         )
- *  (          ))))))________________ Cute And Tiny Window Manager
- *  ______________________________________________________________________________
- *
- *  Copyright (c) 2010, Rinaldini Julien, julien.rinaldini@heig-vd.ch
+ *  Copyright (c) 2022, Vitor Figueiredo
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a
  *  copy of this software and associated documentation files (the "Software"),
@@ -38,7 +30,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 
-#define TABLENGTH(X)    (sizeof(X)/sizeof(*X))
+#define TABLENGTH(x) (sizeof(x)/sizeof(*x))
 
 typedef union {
     const char** com;
@@ -46,29 +38,23 @@ typedef union {
 } Arg;
 
 // Structs
-struct key {
+struct Key {
     unsigned int mod;
     KeySym keysym;
     void (*function)(const Arg arg);
     const Arg arg;
 };
 
-typedef struct client client;
-struct client{
-    // Prev and next client
-    client *next;
-    client *prev;
-
-    // The window
+typedef struct Client Client;
+struct Client {
+    Client *next, *prev;
     Window win;
 };
 
-typedef struct desktop desktop;
-struct desktop{
-    int master_size;
-    int mode;
-    client *head;
-    client *current;
+typedef struct Desktop Desktop;
+struct Desktop{
+    int master_size, mode;
+    Client *head, *current;
 };
 
 // Functions
@@ -79,8 +65,8 @@ static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static void decrease();
 static void destroynotify(XEvent *e);
-static void die(const char* e);
-static unsigned long getcolor(const char* color);
+static void die(const char *e);
+static unsigned long getcolor(const char *color);
 static void grabkeys();
 static void increase();
 static void keypress(XEvent *e);
@@ -114,43 +100,39 @@ static void update_current();
 static Display *dis;
 static int bool_quit;
 static int current_desktop;
-static int master_size;
-static int mode;
-static int sh;
-static int sw;
-static int screen;
-static unsigned int win_focus;
-static unsigned int win_unfocus;
+static int master_size, mode;
+static int screen, sh, sw;
+static unsigned int win_focus, win_unfocus;
 static Window root;
-static client *head;
-static client *current;
+static Client *head, *current;
 
 // Events array
 static void (*events[LASTEvent])(XEvent *e) = {
-    [KeyPress] = keypress,
-    [MapRequest] = maprequest,
-    [DestroyNotify] = destroynotify,
-    [ConfigureNotify] = configurenotify,
+    [KeyPress]         = keypress,
+    [MapRequest]       = maprequest,
+    [DestroyNotify]    = destroynotify,
+    [ConfigureNotify]  = configurenotify,
     [ConfigureRequest] = configurerequest
 };
 
 // Desktop array
-static desktop desktops[10];
+static Desktop desktops[10];
 
-void add_window(Window w) {
-    client *c,*t;
+void add_window(Window w)
+{
+    Client *c, *t;
 
-    if(!(c = (client *)calloc(1,sizeof(client))))
+    if (!(c = (Client *)calloc(1, sizeof(Client))))
         die("Error calloc!");
 
-    if(head == NULL) {
+    if (head == NULL) {
         c->next = NULL;
         c->prev = NULL;
         c->win = w;
         head = c;
     }
     else {
-        for(t=head;t->next;t=t->next);
+        for (t = head; t->next; t = t->next);
 
         c->next = NULL;
         c->prev = t;
@@ -162,16 +144,17 @@ void add_window(Window w) {
     current = c;
 }
 
-void change_desktop(const Arg arg) {
-    client *c;
+void change_desktop(const Arg arg)
+{
+    Client *c;
 
-    if(arg.i == current_desktop)
+    if (arg.i == current_desktop)
         return;
 
     // Unmap all window
-    if(head != NULL)
-        for(c=head;c;c=c->next)
-            XUnmapWindow(dis,c->win);
+    if (head != NULL)
+        for (c = head; c ;c = c->next)
+            XUnmapWindow(dis, c->win);
 
     // Save current "properties"
     save_desktop(current_desktop);
@@ -180,19 +163,20 @@ void change_desktop(const Arg arg) {
     select_desktop(arg.i);
 
     // Map all windows
-    if(head != NULL)
-        for(c=head;c;c=c->next)
-            XMapWindow(dis,c->win);
+    if (head != NULL)
+        for (c = head; c; c = c->next)
+            XMapWindow(dis, c->win);
 
     tile();
     update_current();
 }
 
-void client_to_desktop(const Arg arg) {
-    client *tmp = current;
+void client_to_desktop(const Arg arg)
+{
+    Client *tmp = current;
     int tmp2 = current_desktop;
-    
-    if(arg.i == current_desktop || current == NULL)
+
+    if (arg.i == current_desktop || current == NULL)
         return;
 
     // Add client to desktop
@@ -208,11 +192,13 @@ void client_to_desktop(const Arg arg) {
     update_current();
 }
 
-void configurenotify(XEvent *e) {
+void configurenotify(XEvent *e)
+{
     // Do nothing for the moment
 }
 
-void configurerequest(XEvent *e) {
+void configurerequest(XEvent *e)
+{
     // Paste from DWM, thx again \o/
     XConfigureRequestEvent *ev = &e->xconfigurerequest;
     XWindowChanges wc;
@@ -226,25 +212,27 @@ void configurerequest(XEvent *e) {
     XConfigureWindow(dis, ev->window, ev->value_mask, &wc);
 }
 
-void decrease() {
-    if(master_size > 50) {
+void decrease()
+{
+    if (master_size > 50) {
         master_size -= 10;
         tile();
     }
 }
 
-void destroynotify(XEvent *e) {
-    int i=0;
-    client *c;
+void destroynotify(XEvent *e)
+{
+    int i = 0;
+    Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
     // Uber (and ugly) hack ;)
-    for(c=head;c;c=c->next)
-        if(ev->window == c->win)
-            i++;
-    
+    for (c = head; c; c = c->next)
+        if (ev->window == c->win)
+            ++i;
+
     // End of the hack
-    if(i == 0)
+    if (i == 0)
         return;
 
     remove_window(ev->window);
@@ -252,54 +240,56 @@ void destroynotify(XEvent *e) {
     update_current();
 }
 
-void die(const char* e) {
-    fprintf(stdout,"catwm: %s\n",e);
+void die(const char *e)
+{
+    fprintf(stderr, "nuwm: %s\n", e);
     exit(1);
 }
 
-unsigned long getcolor(const char* color) {
+unsigned long getcolor(const char *color)
+{
     XColor c;
-    Colormap map = DefaultColormap(dis,screen);
+    Colormap map = DefaultColormap(dis, screen);
 
-    if(!XAllocNamedColor(dis,map,color,&c,&c))
+    if (!XAllocNamedColor(dis, map, color, &c, &c))
         die("Error parsing color!");
 
     return c.pixel;
 }
 
-void grabkeys() {
+void grabkeys()
+{
     int i;
     KeyCode code;
 
     // For each shortcuts
-    for(i=0;i<TABLENGTH(keys);++i) {
-        if((code = XKeysymToKeycode(dis,keys[i].keysym))) {
-            XGrabKey(dis,code,keys[i].mod,root,True,GrabModeAsync,GrabModeAsync);
-        }
-    }
+    for (i = 0; i < TABLENGTH(keys); ++i)
+        if ((code = XKeysymToKeycode(dis, keys[i].keysym)))
+            XGrabKey(dis, code, keys[i].mod, root, True, GrabModeAsync, GrabModeAsync);
 }
 
-void increase() {
-    if(master_size < sw-50) {
+void increase()
+{
+    if (master_size < sw-50) {
         master_size += 10;
         tile();
     }
 }
 
-void keypress(XEvent *e) {
+void keypress(XEvent *e)
+{
     int i;
     XKeyEvent ke = e->xkey;
-    KeySym keysym = XKeycodeToKeysym(dis,ke.keycode,0);
+    KeySym keysym = XKeycodeToKeysym(dis, ke.keycode, 0);
 
-    for(i=0;i<TABLENGTH(keys);++i) {
-        if(keys[i].keysym == keysym && keys[i].mod == ke.state) {
+    for (i = 0; i < TABLENGTH(keys); ++i)
+        if (keys[i].keysym == keysym && keys[i].mod == ke.state)
             keys[i].function(keys[i].arg);
-        }
-    }
 }
 
-void kill_client() {
-	if(current != NULL) {
+void kill_client()
+{
+	if (current != NULL) {
 		//send delete signal to window
 		XEvent ke;
 		ke.type = ClientMessage;
@@ -312,14 +302,15 @@ void kill_client() {
 		send_kill_signal(current->win);
 	}
 }
- 
-void maprequest(XEvent *e) {
+
+void maprequest(XEvent *e)
+{
     XMapRequestEvent *ev = &e->xmaprequest;
 
     // For fullscreen mplayer (and maybe some other program)
-    client *c;
-    for(c=head;c;c=c->next)
-        if(ev->window == c->win) {
+    Client *c;
+    for (c = head; c; c = c->next)
+        if (ev->window == c->win) {
             XMapWindow(dis,ev->window);
             return;
         }
@@ -330,11 +321,12 @@ void maprequest(XEvent *e) {
     update_current();
 }
 
-void move_down() {
+void move_down()
+{
     Window tmp;
-    if(current == NULL || current->next == NULL || current->win == head->win || current->prev == NULL) {
+    if (current == NULL || current->next == NULL || current->win == head->win || current->prev == NULL)
         return;
-    }
+
     tmp = current->win;
     current->win = current->next->win;
     current->next->win = tmp;
@@ -344,11 +336,12 @@ void move_down() {
     update_current();
 }
 
-void move_up() {
+void move_up()
+{
     Window tmp;
-    if(current == NULL || current->prev == head || current->win == head->win) {
+    if (current == NULL || current->prev == head || current->win == head->win)
         return;
-    }
+
     tmp = current->win;
     current->win = current->prev->win;
     current->prev->win = tmp;
@@ -357,9 +350,10 @@ void move_up() {
     update_current();
 }
 
-void next_desktop() {
+void next_desktop()
+{
     int tmp = current_desktop;
-    if(tmp== 9)
+    if (tmp== 9)
         tmp = 0;
     else
         tmp++;
@@ -368,10 +362,11 @@ void next_desktop() {
     change_desktop(a);
 }
 
-void next_win() {
-    client *c;
+void next_win()
+{
+    Client *c;
 
-    if(current != NULL && head != NULL) {
+    if (current != NULL && head != NULL) {
 		if(current->next == NULL)
             c = head;
         else
@@ -382,9 +377,10 @@ void next_win() {
     }
 }
 
-void prev_desktop() {
+void prev_desktop()
+{
     int tmp = current_desktop;
-    if(tmp == 0)
+    if (tmp == 0)
         tmp = 9;
     else
         tmp--;
@@ -393,12 +389,13 @@ void prev_desktop() {
     change_desktop(a);
 }
 
-void prev_win() {
-    client *c;
+void prev_win()
+{
+    Client *c;
 
-    if(current != NULL && head != NULL) {
-        if(current->prev == NULL)
-            for(c=head;c->next;c=c->next);
+    if (current != NULL && head != NULL) {
+        if (current->prev == NULL)
+            for (c = head; c->next; c = c->next);
         else
             c = current->prev;
 
@@ -407,11 +404,12 @@ void prev_win() {
     }
 }
 
-void quit() {
+void quit()
+{
     Window root_return, parent;
     Window *children;
     int i;
-    unsigned int nchildren; 
+    unsigned int nchildren;
     XEvent ev;
 
     /*
@@ -421,51 +419,51 @@ void quit() {
      * we can't exit through the main method.
      * This all happens if MOD+q is pushed a second time.
      */
-    if(bool_quit == 1) {
+    if (bool_quit == 1) {
         XUngrabKey(dis, AnyKey, AnyModifier, root);
         XDestroySubwindows(dis, root);
-        fprintf(stdout, "catwm: Thanks for using!\n");
+        printf("nuwm: Thanks for using!\n");
         XCloseDisplay(dis);
         die("forced shutdown");
     }
 
     bool_quit = 1;
     XQueryTree(dis, root, &root_return, &parent, &children, &nchildren);
-    for(i = 0; i < nchildren; i++) {
+    for (i = 0; i < nchildren; ++i)
         send_kill_signal(children[i]);
-    }
+
     //keep alive until all windows are killed
-    while(nchildren > 0) {
+    while (nchildren > 0) {
         XQueryTree(dis, root, &root_return, &parent, &children, &nchildren);
-        XNextEvent(dis,&ev);
+        XNextEvent(dis, &ev);
         if(events[ev.type])
             events[ev.type](&ev);
     }
 
-    XUngrabKey(dis,AnyKey,AnyModifier,root);
-    fprintf(stdout,"catwm: Thanks for using!\n");
+    XUngrabKey(dis, AnyKey, AnyModifier, root);
+    printf("nuwm: Thanks for using!\n");
 }
 
-void remove_window(Window w) {
-    client *c;
+void remove_window(Window w)
+{
+    Client *c;
 
     // CHANGE THIS UGLY CODE
-    for(c=head;c;c=c->next) {
-
-        if(c->win == w) {
-            if(c->prev == NULL && c->next == NULL) {
+    for (c = head; c; c = c->next) {
+        if (c->win == w) {
+            if (c->prev == NULL && c->next == NULL) {
                 free(head);
                 head = NULL;
                 current = NULL;
                 return;
             }
 
-            if(c->prev == NULL) {
+            if (c->prev == NULL) {
                 head = c->next;
                 c->next->prev = NULL;
                 current = c->next;
             }
-            else if(c->next == NULL) {
+            else if (c->next == NULL) {
                 c->prev->next = NULL;
                 current = c->prev;
             }
@@ -481,14 +479,16 @@ void remove_window(Window w) {
     }
 }
 
-void save_desktop(int i) {
+void save_desktop(int i)
+{
     desktops[i].master_size = master_size;
     desktops[i].mode = mode;
     desktops[i].head = head;
     desktops[i].current = current;
 }
 
-void select_desktop(int i) {
+void select_desktop(int i)
+{
     head = desktops[i].head;
     current = desktops[i].current;
     master_size = desktops[i].master_size;
@@ -496,7 +496,8 @@ void select_desktop(int i) {
     current_desktop = i;
 }
 
-void send_kill_signal(Window w) { 
+void send_kill_signal(Window w)
+{
     XEvent ke;
     ke.type = ClientMessage;
     ke.xclient.window = w;
@@ -507,7 +508,8 @@ void send_kill_signal(Window w) {
     XSendEvent(dis, w, False, NoEventMask, &ke);
 }
 
-void setup() {
+void setup()
+{
     // Install a signal
     sigchld(0);
 
@@ -537,11 +539,10 @@ void setup() {
     current = NULL;
 
     // Master size
-    master_size = sw*MASTER_SIZE;
+    master_size = sw * MASTER_SIZE;
 
     // Set up all desktop
-    int i;
-    for(i=0;i<TABLENGTH(desktops);++i) {
+    for (int i = 0; i < TABLENGTH(desktops); ++i) {
         desktops[i].master_size = master_size;
         desktops[i].mode = mode;
         desktops[i].head = head;
@@ -552,45 +553,49 @@ void setup() {
     const Arg arg = {.i = 1};
     current_desktop = arg.i;
     change_desktop(arg);
-    
+
     // To catch maprequest and destroynotify (if other wm running)
-    XSelectInput(dis,root,SubstructureNotifyMask|SubstructureRedirectMask);
+    XSelectInput(dis, root, SubstructureNotifyMask|SubstructureRedirectMask);
 }
 
-void sigchld(int unused) {
+void sigchld(int unused)
+{
     // Again, thx to dwm ;)
-	if(signal(SIGCHLD, sigchld) == SIG_ERR)
+	if (signal(SIGCHLD, sigchld) == SIG_ERR)
 		die("Can't install SIGCHLD handler");
-	while(0 < waitpid(-1, NULL, WNOHANG));
+
+	while (0 < waitpid(-1, NULL, WNOHANG));
 }
 
-void spawn(const Arg arg) {
-    if(fork() == 0) {
-        if(fork() == 0) {
-            if(dis)
+void spawn(const Arg arg)
+{
+    if (fork() == 0) {
+        if (fork() == 0) {
+            if (dis)
                 close(ConnectionNumber(dis));
 
             setsid();
-            execvp((char*)arg.com[0],(char**)arg.com);
+            execvp((char*)arg.com[0], (char**)arg.com);
         }
         exit(0);
     }
 }
 
-void start() {
+void start()
+{
     XEvent ev;
 
     // Main loop, just dispatch events (thx to dwm ;)
-    while(!bool_quit && !XNextEvent(dis,&ev)) {
-        if(events[ev.type])
+    while (!bool_quit && !XNextEvent(dis, &ev))
+        if (events[ev.type])
             events[ev.type](&ev);
-    }
 }
 
-void swap_master() {
+void swap_master()
+{
     Window tmp;
 
-    if(head != NULL && current != NULL && current != head && mode == 0) {
+    if (head != NULL && current != NULL && current != head && mode == 0) {
         tmp = head->win;
         head->win = current->win;
         current->win = tmp;
@@ -601,38 +606,38 @@ void swap_master() {
     }
 }
 
-void switch_mode() {
-    mode = (mode == 0) ? 1:0;
+void switch_mode()
+{
+    mode = (mode == 0) ? 1 : 0;
     tile();
     update_current();
 }
 
-void tile() {
-    client *c;
-    int n = 0;
-    int y = 0;
+void tile()
+{
+    Client *c;
+    int n = 0, y = 0;
 
     // If only one window
-    if(head != NULL && head->next == NULL) {
-        XMoveResizeWindow(dis,head->win,0,0,sw-2,sh-2);
-    }
-    else if(head != NULL) {
-        switch(mode) {
+    if (head != NULL && head->next == NULL)
+        XMoveResizeWindow(dis, head->win, 0, 0, sw - 2, sh - 2);
+    else if (head != NULL) {
+        switch (mode) {
             case 0:
                 // Master window
-                XMoveResizeWindow(dis,head->win,0,0,master_size-2,sh-2);
+                XMoveResizeWindow(dis, head->win, 0, 0, master_size - 2, sh - 2);
 
                 // Stack
-                for(c=head->next;c;c=c->next) ++n;
-                for(c=head->next;c;c=c->next) {
-                    XMoveResizeWindow(dis,c->win,master_size,y,sw-master_size-2,(sh/n)-2);
-                    y += sh/n;
+                for (c = head->next; c; c = c->next)
+                    ++n;
+                for (c = head->next; c; c = c->next) {
+                    XMoveResizeWindow(dis, c->win, master_size, y, sw-master_size - 2, (sh / n) - 2);
+                    y += sh / n;
                 }
                 break;
             case 1:
-                for(c=head;c;c=c->next) {
-                    XMoveResizeWindow(dis,c->win,0,0,sw,sh);
-                }
+                for (c = head; c; c = c->next)
+                    XMoveResizeWindow(dis, c->win, 0, 0, sw, sh);
                 break;
             default:
                 break;
@@ -640,35 +645,36 @@ void tile() {
     }
 }
 
-void update_current() {
-    client *c;
+void update_current()
+{
+    Client *c;
 
-    for(c=head;c;c=c->next)
-        if(current == c) {
+    for (c = head; c; c = c->next)
+        if (current == c) {
             // "Enable" current window
-            XSetWindowBorderWidth(dis,c->win,1);
-            XSetWindowBorder(dis,c->win,win_focus);
-            XSetInputFocus(dis,c->win,RevertToParent,CurrentTime);
-            XRaiseWindow(dis,c->win);
+            XSetWindowBorderWidth(dis, c->win, 1);
+            XSetWindowBorder(dis, c->win, win_focus);
+            XSetInputFocus(dis, c->win, RevertToParent, CurrentTime);
+            XRaiseWindow(dis, c->win);
         }
         else
-            XSetWindowBorder(dis,c->win,win_unfocus);
+            XSetWindowBorder(dis, c->win, win_unfocus);
 }
 
-int main(int argc, char **argv) {
-    // Open display   
-    if(!(dis = XOpenDisplay(NULL)))
+int main(int argc, char **argv)
+{
+    if (!(dis = XOpenDisplay(NULL)))
         die("Cannot open display!");
 
-    // Setup env
     setup();
 
-    // Start wm
-    start();
+#ifdef __OpenBSD__
+	if (pledge("stdio rpath proc exec", NULL) == -1)
+		die("pledge");
+#endif
 
-    // Close display
+    start();
     XCloseDisplay(dis);
 
     return 0;
 }
-
