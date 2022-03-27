@@ -74,9 +74,7 @@ static void kill_client();
 static void maprequest(XEvent *e);
 static void move_down();
 static void move_up();
-static void next_desktop();
 static void next_win();
-static void prev_desktop();
 static void prev_win();
 static void quit();
 static void remove_window(Window w);
@@ -87,7 +85,6 @@ static void setup();
 static void sigchld(int unused);
 static void spawn(const Arg arg);
 static void start();
-//static void swap();
 static void swap_master();
 static void switch_mode();
 static void tile();
@@ -116,7 +113,7 @@ static void (*events[LASTEvent])(XEvent *e) = {
 };
 
 // Desktop array
-static Desktop desktops[10];
+static Desktop desktops[DESKTOPS_SIZE];
 
 void add_window(Window w)
 {
@@ -215,7 +212,7 @@ void configurerequest(XEvent *e)
 void decrease()
 {
     if (master_size > 50) {
-        master_size -= 10;
+        master_size -= CHANGE_AMT;
         tile();
     }
 }
@@ -270,8 +267,8 @@ void grabkeys()
 
 void increase()
 {
-    if (master_size < sw-50) {
-        master_size += 10;
+    if (master_size < sw - 50) {
+        master_size += CHANGE_AMT;
         tile();
     }
 }
@@ -350,18 +347,6 @@ void move_up()
     update_current();
 }
 
-void next_desktop()
-{
-    int tmp = current_desktop;
-    if (tmp== 9)
-        tmp = 0;
-    else
-        tmp++;
-
-    Arg a = {.i = tmp};
-    change_desktop(a);
-}
-
 void next_win()
 {
     Client *c;
@@ -375,18 +360,6 @@ void next_win()
         current = c;
         update_current();
     }
-}
-
-void prev_desktop()
-{
-    int tmp = current_desktop;
-    if (tmp == 0)
-        tmp = 9;
-    else
-        tmp--;
-
-    Arg a = {.i = tmp};
-    change_desktop(a);
 }
 
 void prev_win()
@@ -608,7 +581,7 @@ void swap_master()
 
 void switch_mode()
 {
-    mode = (mode == 0) ? 1 : 0;
+    mode = 1 - mode;
     tile();
     update_current();
 }

@@ -1,9 +1,9 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// Mod (Mod1 == alt, Mod4 == super)
-#define MOD          Mod4Mask
-#define MASTER_SIZE  0.55
+#define MOD          Mod4Mask // Mod (Mod1 == alt, Mod4 == super)
+#define MASTER_SIZE  0.55     // default master size
+#define CHANGE_AMT   15       // amount to increase/decrease master size
 
 // Colors
 #define FOCUS   "rgb:bc/57/66"
@@ -13,6 +13,7 @@ const char* dmenucmd[] = { "dmenu_run", NULL };
 const char* termcmd[]  = { "st", NULL };
 
 #define SHCMD(cmd) { .cmd = (const char* []){ "/bin/sh", "-c", cmd, NULL }}
+#define DESKTOPS_SIZE 7 // number of desktops + 1 (all)
 #define DESKTOPCHANGE(KEY, TAG) \
     {  MOD,             KEY,   change_desktop,    { .i = TAG }}, \
     {  MOD|ShiftMask,   KEY,   client_to_desktop, { .i = TAG }},
