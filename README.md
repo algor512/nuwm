@@ -29,6 +29,12 @@ $ make
 
 By default `nuwm` is installed to `/usr/local/bin`. You can change this in the `Makefile`.
 
+## Bugs
+
+I'm working on fixing the following bugs:
+
+- dunst notifications get placed behind all windows when switching desktops
+
 ## Todo
 
 - Multiple desktop view
