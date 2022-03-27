@@ -39,7 +39,7 @@ I'm working on fixing the following bugs:
 
 - Multiple desktop view
 - Window rules
-- True fullscreen
 - Increase/decrease number of master windows function
 - Log desktop info to stdout to be used by bars that work with stdin
-- Multi monitos
+- Multiple monitors support
+- EWMH support
