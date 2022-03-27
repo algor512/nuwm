@@ -41,7 +41,7 @@ typedef union {
 struct Key {
     unsigned int mod;
     KeySym keysym;
-    void (*function)(const Arg arg);
+    void (*function)(const Arg *arg);
     const Arg arg;
 };
 
@@ -59,16 +59,14 @@ struct Desktop{
 
 // Functions
 static void add_window(Window w);
-static void change_desktop(const Arg arg);
-static void client_to_desktop(const Arg arg);
+static void change_desktop(const Arg *arg);
+static void client_to_desktop(const Arg *arg);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
-static void decrease();
 static void destroynotify(XEvent *e);
 static void die(const char *e);
 static unsigned long getcolor(const char *color);
 static void grabkeys();
-static void increase();
 static void keypress(XEvent *e);
 static void kill_client();
 static void maprequest(XEvent *e);
@@ -78,12 +76,13 @@ static void next_win();
 static void prev_win();
 static void quit();
 static void remove_window(Window w);
+static void resize_master(const Arg *arg);
 static void save_desktop(int i);
 static void select_desktop(int i);
 static void send_kill_signal(Window w);
 static void setup();
 static void sigchld(int unused);
-static void spawn(const Arg arg);
+static void spawn(const Arg *arg);
 static void start();
 static void swap_master();
 static void switch_mode();
@@ -141,11 +140,11 @@ void add_window(Window w)
     current = c;
 }
 
-void change_desktop(const Arg arg)
+void change_desktop(const Arg *arg)
 {
     Client *c;
 
-    if (arg.i == current_desktop)
+    if (arg->i == current_desktop)
         return;
 
     // Unmap all window
@@ -157,7 +156,7 @@ void change_desktop(const Arg arg)
     save_desktop(current_desktop);
 
     // Take "properties" from the new desktop
-    select_desktop(arg.i);
+    select_desktop(arg->i);
 
     // Map all windows
     if (head != NULL)
@@ -168,18 +167,18 @@ void change_desktop(const Arg arg)
     update_current();
 }
 
-void client_to_desktop(const Arg arg)
+void client_to_desktop(const Arg *arg)
 {
     Client *tmp = current;
     int tmp2 = current_desktop;
 
-    if (arg.i == current_desktop || current == NULL)
+    if (arg->i == current_desktop || current == NULL)
         return;
 
     // Add client to desktop
-    select_desktop(arg.i);
+    select_desktop(arg->i);
     add_window(tmp->win);
-    save_desktop(arg.i);
+    save_desktop(arg->i);
 
     // Remove client from current desktop
     select_desktop(tmp2);
@@ -207,14 +206,6 @@ void configurerequest(XEvent *e)
     wc.sibling = ev->above;
     wc.stack_mode = ev->detail;
     XConfigureWindow(dis, ev->window, ev->value_mask, &wc);
-}
-
-void decrease()
-{
-    if (master_size > 50) {
-        master_size -= CHANGE_AMT;
-        tile();
-    }
 }
 
 void destroynotify(XEvent *e)
@@ -265,14 +256,6 @@ void grabkeys()
             XGrabKey(dis, code, keys[i].mod, root, True, GrabModeAsync, GrabModeAsync);
 }
 
-void increase()
-{
-    if (master_size < sw - 50) {
-        master_size += CHANGE_AMT;
-        tile();
-    }
-}
-
 void keypress(XEvent *e)
 {
     int i;
@@ -281,7 +264,7 @@ void keypress(XEvent *e)
 
     for (i = 0; i < TABLENGTH(keys); ++i)
         if (keys[i].keysym == keysym && keys[i].mod == ke.state)
-            keys[i].function(keys[i].arg);
+            keys[i].function(&(keys[i].arg));
 }
 
 void kill_client()
@@ -452,6 +435,18 @@ void remove_window(Window w)
     }
 }
 
+void resize_master(const Arg *arg)
+{
+    if (!arg || !arg->i)
+        return;
+    int new_size = master_size + arg->i;
+    if (50 < new_size && new_size < sw - 50) {
+        master_size = new_size;
+        tile();
+    }
+}
+
+
 void save_desktop(int i)
 {
     desktops[i].master_size = master_size;
@@ -523,9 +518,9 @@ void setup()
     }
 
     // Select first dekstop by default
-    const Arg arg = {.i = 1};
+    const Arg arg = { .i = 1 };
     current_desktop = arg.i;
-    change_desktop(arg);
+    change_desktop(&arg);
 
     // To catch maprequest and destroynotify (if other wm running)
     XSelectInput(dis, root, SubstructureNotifyMask|SubstructureRedirectMask);
@@ -540,7 +535,7 @@ void sigchld(int unused)
 	while (0 < waitpid(-1, NULL, WNOHANG));
 }
 
-void spawn(const Arg arg)
+void spawn(const Arg *arg)
 {
     if (fork() == 0) {
         if (fork() == 0) {
@@ -548,7 +543,7 @@ void spawn(const Arg arg)
                 close(ConnectionNumber(dis));
 
             setsid();
-            execvp((char*)arg.com[0], (char**)arg.com);
+            execvp(((char**)arg->com)[0], (char**)arg->com);
         }
         exit(0);
     }
