@@ -36,9 +36,6 @@ static struct Key keys[] = {
     { MOD,                    XK_space,      switch_mode,    { NULL }             },
     { MOD|ShiftMask,          XK_q,          quit,           { NULL }             },
     { 0,                      XK_Print,      spawn,          SHCMD("prtsc.sh")    },
-    { ShiftMask,              XK_Print,      spawn,          SHCMD("prtsc.sh -s") },
-    { ControlMask,            XK_Print,      spawn,          SHCMD("prtsc.sh -y") },
-    { ControlMask|ShiftMask,  XK_Print,      spawn,          SHCMD("prtsc.sh -ys")},
        DESKTOPCHANGE(         XK_0,                          0)
        DESKTOPCHANGE(         XK_1,                          1)
        DESKTOPCHANGE(         XK_2,                          2)

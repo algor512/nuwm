@@ -16,6 +16,9 @@ OBJ = ${SRC:.c=.o}
 
 all: nuwm
 
+config.h:
+	cp config.def.h $@
+
 nuwm: ${OBJ}
 	${CC} -o $@ ${OBJ} ${LDFLAGS}
 
