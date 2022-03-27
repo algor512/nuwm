@@ -8,6 +8,7 @@
 #define FOCUS   "rgb:bc/57/66"
 #define UNFOCUS "rgb:88/88/88"
 #define BORDER  2
+#define GAP     6
 
 const char* dmenucmd[] = { "dmenu_run", NULL };
 const char* termcmd[]  = { "st", NULL };

@@ -91,6 +91,7 @@ static void update_current();
 
 // Include configuration file (need struct key)
 #include "config.h"
+#define VACUUM (2 * (BORDER + GAP))
 
 // Variable
 static Display *dis;
@@ -584,23 +585,30 @@ void switch_mode()
 void tile()
 {
     Client *c;
-    int n = 0, y = 0;
+    int n = 0, x = GAP, y = GAP;
+    int w = sw - VACUUM, h = sh - VACUUM;
 
     // If only one window
     if (head != NULL && head->next == NULL)
-        XMoveResizeWindow(dis, head->win, 0, 0, sw - 2, sh - 2);
+        XMoveResizeWindow(dis, head->win, x, y, w, h);
     else if (head != NULL) {
         switch (mode) {
             case 0:
                 // Master window
-                XMoveResizeWindow(dis, head->win, 0, 0, master_size - 2, sh - 2);
+                w = master_size - VACUUM + GAP / 2;
+                h = sh - VACUUM;
+                XMoveResizeWindow(dis, head->win, x, y, w, h);
 
                 // Stack
                 for (c = head->next; c; c = c->next)
                     ++n;
+                // x, w and h are constant for windows in the stack
+                x = master_size + GAP / 2;
+                w = sw - master_size - VACUUM + GAP / 2;
+                h = (sh - 2 * n * BORDER - n * GAP - GAP) / n;
                 for (c = head->next; c; c = c->next) {
-                    XMoveResizeWindow(dis, c->win, master_size, y, sw-master_size - 2, (sh / n) - 2);
-                    y += sh / n;
+                    XMoveResizeWindow(dis, c->win, x, y, w, h);
+                    y += h + VACUUM - GAP;
                 }
                 break;
             case 1:
