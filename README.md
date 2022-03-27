@@ -31,7 +31,8 @@ By default `nuwm` is installed to `/usr/local/bin`. You can change this in the `
 
 ## Todo
 
-- Log desktop info to stdout to be used by bars that work with stdin
 - Multiple desktop view
 - Window rules
-- Increase/decrease number of master windows
+- True fullscreen
+- Increase/decrease number of master windows function
+- Log desktop info to stdout to be used by bars that work with stdin
