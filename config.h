@@ -19,7 +19,7 @@ const char* termcmd[]  = { "st", NULL };
     {  MOD,             KEY,   change_desktop,    { .i = TAG }}, \
     {  MOD|ShiftMask,   KEY,   client_to_desktop, { .i = TAG }},
 
-#define SHCMD(cmd) { .cmd = (const char* []){ "/bin/sh", "-c", cmd, NULL }}
+#define SHCMD(cmd) { .com = (const char* []){ "/bin/sh", "-c", cmd, NULL }}
 
 static struct Key keys[] = {
     // MOD                    KEY            FUNCTION        ARGS
