@@ -227,13 +227,11 @@ void destroynotify(XEvent *e)
     Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
-    for (c = head; c; c = c->next)
-        if (ev->window == c->win) {
-            remove_window(ev->window);
-            tile();
-            update_current();
-            break;
-        }
+    if ((c = wintoclient(ev->window)) != NULL) {
+        remove_window(ev->window);
+        tile();
+        update_current();
+    }
 
 }
 
@@ -301,11 +299,10 @@ void maprequest(XEvent *e)
 
     // For fullscreen mplayer (and maybe some other program)
     Client *c;
-    for (c = head; c; c = c->next)
-        if (ev->window == c->win) {
-            XMapWindow(dis, ev->window);
-            return;
-        }
+    if ((c = wintoclient(ev->window)) != NULL) {
+        XMapWindow(dis, ev->window);
+        return;
+    }
 
     add_window(ev->window);
     XMapWindow(dis,ev->window);
@@ -417,36 +414,33 @@ void remove_window(Window w)
     Client *c;
 
     // CHANGE THIS UGLY CODE
-    for (c = head; c; c = c->next) {
-        if (c->win != w)
-            continue;
+    if ((c = wintoclient(w)) == NULL)
+        return;
 
-        XUnmapWindow(dis, c->win);
-        if (c->prev == NULL && c->next == NULL) {
-            free(head);
-            head = NULL;
-            current = NULL;
-            break;
-        }
-
-        if (c->prev == NULL) {
-            head = c->next;
-            c->next->prev = NULL;
-            current = c->next;
-        }
-        else if (c->next == NULL) {
-            c->prev->next = NULL;
-            current = c->prev;
-        }
-        else {
-            c->prev->next = c->next;
-            c->next->prev = c->prev;
-            current = c->prev;
-        }
-
-        free(c);
-        break;
+    XUnmapWindow(dis, c->win);
+    if (c->prev == NULL && c->next == NULL) {
+        free(head);
+        head = NULL;
+        current = NULL;
+        return;
     }
+
+    if (c->prev == NULL) {
+        head = c->next;
+        c->next->prev = NULL;
+        current = c->next;
+    }
+    else if (c->next == NULL) {
+        c->prev->next = NULL;
+        current = c->prev;
+    }
+    else {
+        c->prev->next = c->next;
+        c->next->prev = c->prev;
+        current = c->prev;
+    }
+
+    free(c);
 }
 
 void resize_master(const Arg *arg)
