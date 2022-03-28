@@ -113,7 +113,6 @@ static void (*events[LASTEvent])(XEvent *e) = {
     [KeyPress]         = keypress,
     [MapRequest]       = maprequest,
     [DestroyNotify]    = destroynotify,
-    [ConfigureNotify]  = configurenotify,
     [ConfigureRequest] = configurerequest
 };
 
@@ -193,11 +192,6 @@ void client_to_desktop(const Arg *arg)
 
     tile();
     update_current();
-}
-
-void configurenotify(XEvent *e)
-{
-    // Do nothing for the moment
 }
 
 void configurerequest(XEvent *e)
@@ -481,6 +475,9 @@ void send_kill_signal(Window w)
 
 void setup()
 {
+    if ((dis = XOpenDisplay(NULL)) == NULL)
+        die("cannot open display!");
+
     // Error handling
     xerrorxlib = XSetErrorHandler(xerrorstart);
     XSelectInput(dis, DefaultRootWindow(dis), SubstructureRedirectMask);
@@ -508,15 +505,9 @@ void setup()
 
     // Vertical stack
     mode = 0;
-
-    // For exiting
     bool_quit = 0;
-
-    // List of client
     head = NULL;
     current = NULL;
-
-    // Master size
     master_size = sw * MASTER_SIZE;
 
     // Set up all desktop
@@ -563,10 +554,11 @@ void start()
 {
     XEvent ev;
 
-    // Main loop, just dispatch events (thx to dwm ;)
-    while (!bool_quit && !XNextEvent(dis, &ev))
-        if (events[ev.type])
+    while (!bool_quit && XPending(dis)) {
+        XNextEvent(dis, &ev);
+        if (ev.type < LASTEvent && events[ev.type] != NULL)
             events[ev.type](&ev);
+    }
 }
 
 void swap_master()
@@ -677,9 +669,6 @@ int xerrorstart(Display *dpy, XErrorEvent *ee)
 
 int main(int argc, char **argv)
 {
-    if (!(dis = XOpenDisplay(NULL)))
-        die("Cannot open display!");
-
     setup();
 
 #ifdef __OpenBSD__
