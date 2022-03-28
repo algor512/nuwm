@@ -60,9 +60,9 @@ struct Desktop{
 
 // Functions
 static void add_window(Window w);
+static void buttonpress(XEvent *e);
 static void change_desktop(const Arg *arg);
 static void client_to_desktop(const Arg *arg);
-static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
 static void destroynotify(XEvent *e);
 static void die(const char *e);
@@ -92,6 +92,7 @@ static void update_current();
 static int xerror(Display *dpy, XErrorEvent *ee);
 /* static int xerrordummy(Display *dpy, XErrorEvent *ee); */
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
+static Client *wintoclient(Window w);
 
 // Include configuration file (need struct key)
 #include "config.h"
@@ -110,6 +111,7 @@ static int (*xerrorxlib)(Display *, XErrorEvent *);
 
 // Events array
 static void (*events[LASTEvent])(XEvent *e) = {
+	[ButtonPress]      = buttonpress,
     [KeyPress]         = keypress,
     [MapRequest]       = maprequest,
     [DestroyNotify]    = destroynotify,
@@ -143,6 +145,17 @@ void add_window(Window w)
     }
 
     current = c;
+}
+
+void buttonpress(XEvent *e)
+{
+    Client *c;
+    XButtonPressedEvent *ev = &e->xbutton;
+
+    if ((c = wintoclient(ev->subwindow)) != NULL) {
+        current = c;
+        update_current();
+    }
 }
 
 void change_desktop(const Arg *arg)
@@ -250,6 +263,9 @@ void grabkeys()
     for (i = 0; i < TABLENGTH(keys); ++i)
         if ((code = XKeysymToKeycode(dis, keys[i].keysym)))
             XGrabKey(dis, code, keys[i].mod, root, True, GrabModeAsync, GrabModeAsync);
+
+    for (i = 1; i < 4; i += 2) // left and right mouse button
+        XGrabButton(dis, i, 0, root, True, ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None);
 }
 
 void keypress(XEvent *e)
@@ -371,6 +387,7 @@ void quit()
      */
     if (bool_quit == 1) {
         XUngrabKey(dis, AnyKey, AnyModifier, root);
+        XUngrabButton(dis, AnyButton, AnyModifier, root);
         XDestroySubwindows(dis, root);
         printf("nuwm: Thanks for using!\n");
         XCloseDisplay(dis);
@@ -391,6 +408,7 @@ void quit()
     }
 
     XUngrabKey(dis, AnyKey, AnyModifier, root);
+    XUngrabButton(dis, AnyButton, AnyModifier, root);
     printf("nuwm: Thanks for using!\n");
 }
 
@@ -554,8 +572,7 @@ void start()
 {
     XEvent ev;
 
-    while (!bool_quit && XPending(dis)) {
-        XNextEvent(dis, &ev);
+    while (!bool_quit && !XNextEvent(dis, &ev)) {
         if (ev.type < LASTEvent && events[ev.type] != NULL)
             events[ev.type](&ev);
     }
@@ -665,6 +682,16 @@ int xerrorstart(Display *dpy, XErrorEvent *ee)
 {
     die("Another window manager is already running!");
     return 1;
+}
+
+Client *wintoclient(Window w)
+{
+    Client *c;
+
+    for (c = head; c != NULL; c = c->next)
+        if (c->win == w)
+            return c;
+    return NULL;
 }
 
 int main(int argc, char **argv)
