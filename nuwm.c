@@ -148,10 +148,10 @@ void add_window(Window w)
 
 void change_desktop(const Arg *arg)
 {
-    Client *c;
-
     if (arg->i == current_desktop)
         return;
+
+    Client *c;
 
     // Unmap all window
     for (c = head; c ;c = c->next)
@@ -293,7 +293,7 @@ void maprequest(XEvent *e)
     Client *c;
     for (c = head; c; c = c->next)
         if (ev->window == c->win) {
-            XMapWindow(dis,ev->window);
+            XMapWindow(dis, ev->window);
             return;
         }
 
@@ -305,11 +305,10 @@ void maprequest(XEvent *e)
 
 void move_down()
 {
-    Window tmp;
     if (current == NULL || current->next == NULL || current->win == head->win || current->prev == NULL)
         return;
 
-    tmp = current->win;
+    Window tmp = current->win;
     current->win = current->next->win;
     current->next->win = tmp;
     //keep the moved window activated
@@ -320,11 +319,10 @@ void move_down()
 
 void move_up()
 {
-    Window tmp;
     if (current == NULL || current->prev == head || current->win == head->win)
         return;
 
-    tmp = current->win;
+    Window tmp = current->win;
     current->win = current->prev->win;
     current->prev->win = tmp;
     prev_win();
@@ -443,6 +441,7 @@ void resize_master(const Arg *arg)
 {
     if (!arg || !arg->i)
         return;
+
     int new_size = master_size + arg->i;
     if (50 < new_size && new_size < sw - 50) {
         master_size = new_size;
@@ -594,14 +593,17 @@ void switch_mode()
 
 void tile()
 {
+    if (head == NULL)
+        return;
+
     Client *c;
     int n = 0, x = GAP, y = GAP;
     int w = sw - VACUUM, h = sh - VACUUM;
 
     // If only one window
-    if (head != NULL && head->next == NULL)
+    if (head->next == NULL)
         XMoveResizeWindow(dis, head->win, x, y, w, h);
-    else if (head != NULL) {
+    else {
         switch (mode) {
             case 0:
                 // Master window
@@ -662,6 +664,7 @@ int xerror(Display *dpy, XErrorEvent *ee)
             || (ee->request_code == 139 && ee->error_code == BadDrawable)
             || (ee->request_code == 139 && ee->error_code == 143))
         return 0;
+
     fprintf(stderr, "nuwm: fatal error: request code=%d, error code=%d\n", ee->request_code, ee->error_code);
     return xerrorxlib(dpy, ee); /* may call exit */
 }
