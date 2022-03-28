@@ -154,9 +154,8 @@ void change_desktop(const Arg *arg)
         return;
 
     // Unmap all window
-    if (head != NULL)
-        for (c = head; c ;c = c->next)
-            XUnmapWindow(dis, c->win);
+    for (c = head; c ;c = c->next)
+        XUnmapWindow(dis, c->win);
 
     // Save current "properties"
     save_desktop(current_desktop);
@@ -165,9 +164,8 @@ void change_desktop(const Arg *arg)
     select_desktop(arg->i);
 
     // Map all windows
-    if (head != NULL)
-        for (c = head; c; c = c->next)
-            XMapWindow(dis, c->win);
+    for (c = head; c; c = c->next)
+        XMapWindow(dis, c->win);
 
     tile();
     update_current();
@@ -219,22 +217,17 @@ void configurerequest(XEvent *e)
 
 void destroynotify(XEvent *e)
 {
-    int i = 0;
     Client *c;
     XDestroyWindowEvent *ev = &e->xdestroywindow;
 
-    // Uber (and ugly) hack ;)
     for (c = head; c; c = c->next)
-        if (ev->window == c->win)
-            ++i;
+        if (ev->window == c->win) {
+            remove_window(ev->window);
+            tile();
+            update_current();
+            break;
+        }
 
-    // End of the hack
-    if (i == 0)
-        return;
-
-    remove_window(ev->window);
-    tile();
-    update_current();
 }
 
 void die(const char *e)
@@ -278,18 +271,18 @@ void keypress(XEvent *e)
 
 void kill_client()
 {
-	if (current != NULL) {
-		//send delete signal to window
-		XEvent ke;
-		ke.type = ClientMessage;
-		ke.xclient.window = current->win;
-		ke.xclient.message_type = XInternAtom(dis, "WM_PROTOCOLS", True);
-		ke.xclient.format = 32;
-		ke.xclient.data.l[0] = XInternAtom(dis, "WM_DELETE_WINDOW", True);
-		ke.xclient.data.l[1] = CurrentTime;
-		XSendEvent(dis, current->win, False, NoEventMask, &ke);
-		send_kill_signal(current->win);
-	}
+    if (current != NULL) {
+        //send delete signal to window
+        XEvent ke;
+        ke.type = ClientMessage;
+        ke.xclient.window = current->win;
+        ke.xclient.message_type = XInternAtom(dis, "WM_PROTOCOLS", True);
+        ke.xclient.format = 32;
+        ke.xclient.data.l[0] = XInternAtom(dis, "WM_DELETE_WINDOW", True);
+        ke.xclient.data.l[1] = CurrentTime;
+        XSendEvent(dis, current->win, False, NoEventMask, &ke);
+        send_kill_signal(current->win);
+    }
 }
 
 void maprequest(XEvent *e)
@@ -344,7 +337,7 @@ void next_win()
     Client *c;
 
     if (current != NULL && head != NULL) {
-		if(current->next == NULL)
+        if(current->next == NULL)
             c = head;
         else
             c = current->next;
@@ -418,6 +411,7 @@ void remove_window(Window w)
         if (c->win != w)
             continue;
 
+        XUnmapWindow(dis, c->win);
         if (c->prev == NULL && c->next == NULL) {
             free(head);
             head = NULL;
