@@ -175,20 +175,23 @@ void change_desktop(const Arg *arg)
 
 void client_to_desktop(const Arg *arg)
 {
-    Client *tmp = current;
-    int tmp2 = current_desktop;
-
     if (arg->i == current_desktop || current == NULL)
         return;
 
+    Window tmp_win = current->win;
+    int tmp_current_desktop = current_desktop;
+
+    // Save current desktop to avoid seg fault in *
+    save_desktop(current_desktop);
+
     // Add client to desktop
     select_desktop(arg->i);
-    add_window(tmp->win);
+    add_window(tmp_win);
     save_desktop(arg->i);
 
     // Remove client from current desktop
-    select_desktop(tmp2);
-    remove_window(current->win);
+    select_desktop(tmp_current_desktop);
+    remove_window(current->win); // *
 
     tile();
     update_current();
@@ -412,32 +415,33 @@ void remove_window(Window w)
 
     // CHANGE THIS UGLY CODE
     for (c = head; c; c = c->next) {
-        if (c->win == w) {
-            if (c->prev == NULL && c->next == NULL) {
-                free(head);
-                head = NULL;
-                current = NULL;
-                return;
-            }
+        if (c->win != w)
+            continue;
 
-            if (c->prev == NULL) {
-                head = c->next;
-                c->next->prev = NULL;
-                current = c->next;
-            }
-            else if (c->next == NULL) {
-                c->prev->next = NULL;
-                current = c->prev;
-            }
-            else {
-                c->prev->next = c->next;
-                c->next->prev = c->prev;
-                current = c->prev;
-            }
-
-            free(c);
-            return;
+        if (c->prev == NULL && c->next == NULL) {
+            free(head);
+            head = NULL;
+            current = NULL;
+            break;
         }
+
+        if (c->prev == NULL) {
+            head = c->next;
+            c->next->prev = NULL;
+            current = c->next;
+        }
+        else if (c->next == NULL) {
+            c->prev->next = NULL;
+            current = c->prev;
+        }
+        else {
+            c->prev->next = c->next;
+            c->next->prev = c->prev;
+            current = c->prev;
+        }
+
+        free(c);
+        break;
     }
 }
 
@@ -485,11 +489,11 @@ void send_kill_signal(Window w)
 void setup()
 {
     // Error handling
-	xerrorxlib = XSetErrorHandler(xerrorstart);
-	XSelectInput(dis, DefaultRootWindow(dis), SubstructureRedirectMask);
-	XSync(dis, False);
-	XSetErrorHandler(xerror);
-	XSync(dis, False);
+    xerrorxlib = XSetErrorHandler(xerrorstart);
+    XSelectInput(dis, DefaultRootWindow(dis), SubstructureRedirectMask);
+    XSync(dis, False);
+    XSetErrorHandler(xerror);
+    XSync(dis, False);
 
     // Install a signal
     sigchld(0);
@@ -542,10 +546,10 @@ void setup()
 void sigchld(int unused)
 {
     // Again, thx to dwm ;)
-	if (signal(SIGCHLD, sigchld) == SIG_ERR)
-		die("Can't install SIGCHLD handler");
+    if (signal(SIGCHLD, sigchld) == SIG_ERR)
+        die("Can't install SIGCHLD handler");
 
-	while (0 < waitpid(-1, NULL, WNOHANG));
+    while (0 < waitpid(-1, NULL, WNOHANG));
 }
 
 void spawn(const Arg *arg)
