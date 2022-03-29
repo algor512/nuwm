@@ -42,4 +42,3 @@ I'm working on fixing the following bugs:
 - Increase/decrease number of master windows function
 - Log desktop info to stdout to be used by bars that work with stdin
 - Multiple monitors support
-- EWMH support
