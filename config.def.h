@@ -14,7 +14,6 @@ const char* dmenucmd[] = { "dmenu_run", NULL };
 const char* termcmd[]  = { "st", NULL };
 
 
-#define DESKTOPS_SIZE 7         // number of desktops + 1 (all)
 #define DESKTOPCHANGE(KEY, TAG) \
     {  MOD,             KEY,   change_desktop,    { .i = TAG }}, \
     {  MOD|ShiftMask,   KEY,   client_to_desktop, { .i = TAG }},
@@ -43,6 +42,7 @@ static struct Key keys[] = {
        DESKTOPCHANGE(         XK_4,                          4)
        DESKTOPCHANGE(         XK_5,                          5)
        DESKTOPCHANGE(         XK_6,                          6)
+#define DESKTOPS_SIZE            7
 };
 
 #endif // CONFIG_H

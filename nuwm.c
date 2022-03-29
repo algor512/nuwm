@@ -590,7 +590,7 @@ void setup()
     master_size = sw * MASTER_SIZE;
 
     // Set up all desktop
-    for (int i = 0; i < TABLENGTH(desktops); ++i) {
+    for (int i = 0; i < DESKTOPS_SIZE; ++i) {
         desktops[i].master_size = master_size;
         desktops[i].mode = mode;
         desktops[i].head = head;
