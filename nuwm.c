@@ -129,7 +129,7 @@ static void (*events[LASTEvent])(XEvent *e) = {
 // Desktop array
 static Desktop desktops[DESKTOPS_SIZE];
 
-// Implementation of public function
+// Implementation of public functions
 void change_desktop(const Arg *arg)
 {
     if (arg->i == current_desktop)

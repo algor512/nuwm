@@ -49,3 +49,4 @@ I'm working on fixing the following bugs:
 - MonsterWM - [monsterwm](https://github.com/c00kiemon5ter/monsterwm)
 - Dynamic Window Manager by Suckless - [dwm](https://git.suckless.org/dwm/)
 - Calm Window Manager by OpenBSD - [cwm](https://github.com/openbsd/xenocara/tree/master/app/cwm)
+- Berry - [berrywm](https://github.com/JLErvin/berry)
