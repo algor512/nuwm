@@ -33,12 +33,12 @@
 
 #define TABLENGTH(x) (sizeof(x)/sizeof(*x))
 
+// Types visible from config.h
 typedef union {
     const char** com;
     const int i;
 } Arg;
 
-// Structs
 struct Key {
     unsigned int mod;
     KeySym keysym;
@@ -46,6 +46,24 @@ struct Key {
     const Arg arg;
 };
 
+// Functions visible from config.h (public)
+static void change_desktop(const Arg *);
+static void client_to_desktop(const Arg *);
+static void kill_client(const Arg *);
+static void move_down(const Arg *);
+static void move_up(const Arg *);
+static void next_win(const Arg *);
+static void prev_win(const Arg *);
+static void quit(const Arg *);
+static void resize_master(const Arg *);
+static void spawn(const Arg *);
+static void swap_master(const Arg *);
+static void switch_mode(const Arg *);
+
+#include "config.h"
+#define VACUUM (2 * (BORDER + GAP))
+
+// Types not visible from config.h (public)
 typedef struct Client Client;
 struct Client {
     Client *next, *prev;
@@ -58,46 +76,29 @@ struct Desktop{
     Client *head, *current;
 };
 
-// Functions
-static void add_window(Window w);
-static void change_desktop(const Arg *arg);
-static void client_to_desktop(const Arg *arg);
-static void configurerequest(XEvent *e);
-static void destroynotify(XEvent *e);
-static void die(const char *e);
-static unsigned long getcolor(const char *color);
-static void grabkeys();
-static void keypress(XEvent *e);
-static void kill_client();
-static void maprequest(XEvent *e);
-static void move_down();
-static void move_up();
-static void next_win();
-static void prev_win();
-static void quit();
-static void remove_window(Window w);
-static void resize_master(const Arg *arg);
-static void save_desktop(int i);
-static void select_desktop(int i);
-static void send_kill_signal(Window w);
-static void setup();
-static void sigchld(int unused);
-static void spawn(const Arg *arg);
-static void start();
-static void swap_master();
-static void switch_mode();
-static void tile();
-static void update_current();
-static int xerror(Display *dpy, XErrorEvent *ee);
-/* static int xerrordummy(Display *dpy, XErrorEvent *ee); */
-static int xerrorstart(Display *dpy, XErrorEvent *ee);
-static Client *wintoclient(Window w);
+// Functions not visible from config.h (private)
+static void add_window(Window);
+static void configurerequest(XEvent *);
+static void destroynotify(XEvent *);
+static void die(const char *);
+static unsigned long getcolor(const char *);
+static void grabkeys(void);
+static void keypress(XEvent *);
+static void maprequest(XEvent *);
+static void remove_window(Window);
+static void save_desktop(int);
+static void select_desktop(int);
+static void send_kill_signal(Window);
+static void setup(void);
+static void sigchld(int);
+static void start(void);
+static void tile(void);
+static void update_current(void);
+static int xerror(Display *, XErrorEvent *);
+static int xerrorstart(Display *, XErrorEvent *);
+static Client *wintoclient(Window);
 
-// Include configuration file (need struct key)
-#include "config.h"
-#define VACUUM (2 * (BORDER + GAP))
-
-// Variable
+// Variables
 static Display *dis;
 static int bool_quit;
 static int current_desktop;
@@ -119,32 +120,7 @@ static void (*events[LASTEvent])(XEvent *e) = {
 // Desktop array
 static Desktop desktops[DESKTOPS_SIZE];
 
-void add_window(Window w)
-{
-    Client *c, *t;
-
-    if (!(c = (Client *)calloc(1, sizeof(Client))))
-        die("Error calloc!");
-
-    if (head == NULL) {
-        c->next = NULL;
-        c->prev = NULL;
-        c->win = w;
-        head = c;
-    }
-    else {
-        for (t = head; t->next; t = t->next);
-
-        c->next = NULL;
-        c->prev = t;
-        c->win = w;
-
-        t->next = c;
-    }
-
-    current = c;
-}
-
+// Implementation of public function
 void change_desktop(const Arg *arg)
 {
     if (arg->i == current_desktop)
@@ -194,6 +170,194 @@ void client_to_desktop(const Arg *arg)
     update_current();
 }
 
+void kill_client(const Arg *arg)
+{
+    if (current != NULL) {
+        //send delete signal to window
+        XEvent ke;
+        ke.type = ClientMessage;
+        ke.xclient.window = current->win;
+        ke.xclient.message_type = XInternAtom(dis, "WM_PROTOCOLS", True);
+        ke.xclient.format = 32;
+        ke.xclient.data.l[0] = XInternAtom(dis, "WM_DELETE_WINDOW", True);
+        ke.xclient.data.l[1] = CurrentTime;
+        XSendEvent(dis, current->win, False, NoEventMask, &ke);
+        send_kill_signal(current->win);
+    }
+}
+
+void move_down(const Arg *arg)
+{
+    if (current == NULL || current->next == NULL || current->win == head->win || current->prev == NULL)
+        return;
+
+    Window tmp = current->win;
+    current->win = current->next->win;
+    current->next->win = tmp;
+    //keep the moved window activated
+    next_win(NULL);
+    tile();
+    update_current();
+}
+
+void move_up(const Arg *arg)
+{
+    if (current == NULL || current->prev == head || current->win == head->win)
+        return;
+
+    Window tmp = current->win;
+    current->win = current->prev->win;
+    current->prev->win = tmp;
+    prev_win(NULL);
+    tile();
+    update_current();
+}
+
+void next_win(const Arg *arg)
+{
+    Client *c;
+
+    if (current != NULL && head != NULL) {
+        if(current->next == NULL)
+            c = head;
+        else
+            c = current->next;
+
+        current = c;
+        update_current();
+    }
+}
+
+void prev_win(const Arg *arg)
+{
+    Client *c;
+
+    if (current != NULL && head != NULL) {
+        if (current->prev == NULL)
+            for (c = head; c->next; c = c->next);
+        else
+            c = current->prev;
+
+        current = c;
+        update_current();
+    }
+}
+
+void quit(const Arg *arg)
+{
+    Window root_return, parent;
+    Window *children;
+    int i;
+    unsigned int nchildren;
+    XEvent ev;
+
+    /*
+     * if a client refuses to terminate itself,
+     * we kill every window remaining the brutal way.
+     * Since we're stuck in the while(nchildren > 0) { ... } loop
+     * we can't exit through the main method.
+     * This all happens if MOD+q is pushed a second time.
+     */
+    if (bool_quit == 1) {
+        XUngrabKey(dis, AnyKey, AnyModifier, root);
+        XDestroySubwindows(dis, root);
+        printf("nuwm: Thanks for using!\n");
+        XCloseDisplay(dis);
+        die("forced shutdown");
+    }
+
+    bool_quit = 1;
+    XQueryTree(dis, root, &root_return, &parent, &children, &nchildren);
+    for (i = 0; i < nchildren; ++i)
+        send_kill_signal(children[i]);
+
+    //keep alive until all windows are killed
+    while (nchildren > 0) {
+        XQueryTree(dis, root, &root_return, &parent, &children, &nchildren);
+        XNextEvent(dis, &ev);
+        if(events[ev.type])
+            events[ev.type](&ev);
+    }
+
+    XUngrabKey(dis, AnyKey, AnyModifier, root);
+    printf("nuwm: Thanks for using!\n");
+}
+
+void resize_master(const Arg *arg)
+{
+    if (!arg || !arg->i)
+        return;
+
+    int new_size = master_size + arg->i;
+    if (50 < new_size && new_size < sw - 50) {
+        master_size = new_size;
+        tile();
+    }
+}
+
+void spawn(const Arg *arg)
+{
+    if (fork() == 0) {
+        if (fork() == 0) {
+            if (dis)
+                close(ConnectionNumber(dis));
+
+            setsid();
+            execvp(((char**)arg->com)[0], (char**)arg->com);
+        }
+        exit(0);
+    }
+}
+
+void swap_master(const Arg *arg)
+{
+    Window tmp;
+
+    if (head != NULL && current != NULL && current != head && mode == 0) {
+        tmp = head->win;
+        head->win = current->win;
+        current->win = tmp;
+        current = head;
+
+        tile();
+        update_current();
+    }
+}
+
+void switch_mode(const Arg *arg)
+{
+    mode = 1 - mode;
+    tile();
+    update_current();
+}
+
+// Implementation of private functions
+void add_window(Window w)
+{
+    Client *c, *t;
+
+    if (!(c = (Client *)calloc(1, sizeof(Client))))
+        die("Error calloc!");
+
+    if (head == NULL) {
+        c->next = NULL;
+        c->prev = NULL;
+        c->win = w;
+        head = c;
+    }
+    else {
+        for (t = head; t->next; t = t->next);
+
+        c->next = NULL;
+        c->prev = t;
+        c->win = w;
+
+        t->next = c;
+    }
+
+    current = c;
+}
+
 void configurerequest(XEvent *e)
 {
     // Paste from DWM, thx again \o/
@@ -207,6 +371,7 @@ void configurerequest(XEvent *e)
     wc.sibling = ev->above;
     wc.stack_mode = ev->detail;
     XConfigureWindow(dis, ev->window, ev->value_mask, &wc);
+    XSync(dis, False);
 }
 
 void destroynotify(XEvent *e)
@@ -261,22 +426,6 @@ void keypress(XEvent *e)
             keys[i].function(&(keys[i].arg));
 }
 
-void kill_client()
-{
-    if (current != NULL) {
-        //send delete signal to window
-        XEvent ke;
-        ke.type = ClientMessage;
-        ke.xclient.window = current->win;
-        ke.xclient.message_type = XInternAtom(dis, "WM_PROTOCOLS", True);
-        ke.xclient.format = 32;
-        ke.xclient.data.l[0] = XInternAtom(dis, "WM_DELETE_WINDOW", True);
-        ke.xclient.data.l[1] = CurrentTime;
-        XSendEvent(dis, current->win, False, NoEventMask, &ke);
-        send_kill_signal(current->win);
-    }
-}
-
 void maprequest(XEvent *e)
 {
     XMapRequestEvent *ev = &e->xmaprequest;
@@ -292,103 +441,6 @@ void maprequest(XEvent *e)
     XMapWindow(dis,ev->window);
     tile();
     update_current();
-}
-
-void move_down()
-{
-    if (current == NULL || current->next == NULL || current->win == head->win || current->prev == NULL)
-        return;
-
-    Window tmp = current->win;
-    current->win = current->next->win;
-    current->next->win = tmp;
-    //keep the moved window activated
-    next_win();
-    tile();
-    update_current();
-}
-
-void move_up()
-{
-    if (current == NULL || current->prev == head || current->win == head->win)
-        return;
-
-    Window tmp = current->win;
-    current->win = current->prev->win;
-    current->prev->win = tmp;
-    prev_win();
-    tile();
-    update_current();
-}
-
-void next_win()
-{
-    Client *c;
-
-    if (current != NULL && head != NULL) {
-        if(current->next == NULL)
-            c = head;
-        else
-            c = current->next;
-
-        current = c;
-        update_current();
-    }
-}
-
-void prev_win()
-{
-    Client *c;
-
-    if (current != NULL && head != NULL) {
-        if (current->prev == NULL)
-            for (c = head; c->next; c = c->next);
-        else
-            c = current->prev;
-
-        current = c;
-        update_current();
-    }
-}
-
-void quit()
-{
-    Window root_return, parent;
-    Window *children;
-    int i;
-    unsigned int nchildren;
-    XEvent ev;
-
-    /*
-     * if a client refuses to terminate itself,
-     * we kill every window remaining the brutal way.
-     * Since we're stuck in the while(nchildren > 0) { ... } loop
-     * we can't exit through the main method.
-     * This all happens if MOD+q is pushed a second time.
-     */
-    if (bool_quit == 1) {
-        XUngrabKey(dis, AnyKey, AnyModifier, root);
-        XDestroySubwindows(dis, root);
-        printf("nuwm: Thanks for using!\n");
-        XCloseDisplay(dis);
-        die("forced shutdown");
-    }
-
-    bool_quit = 1;
-    XQueryTree(dis, root, &root_return, &parent, &children, &nchildren);
-    for (i = 0; i < nchildren; ++i)
-        send_kill_signal(children[i]);
-
-    //keep alive until all windows are killed
-    while (nchildren > 0) {
-        XQueryTree(dis, root, &root_return, &parent, &children, &nchildren);
-        XNextEvent(dis, &ev);
-        if(events[ev.type])
-            events[ev.type](&ev);
-    }
-
-    XUngrabKey(dis, AnyKey, AnyModifier, root);
-    printf("nuwm: Thanks for using!\n");
 }
 
 void remove_window(Window w)
@@ -424,19 +476,6 @@ void remove_window(Window w)
 
     free(c);
 }
-
-void resize_master(const Arg *arg)
-{
-    if (!arg || !arg->i)
-        return;
-
-    int new_size = master_size + arg->i;
-    if (50 < new_size && new_size < sw - 50) {
-        master_size = new_size;
-        tile();
-    }
-}
-
 
 void save_desktop(int i)
 {
@@ -530,20 +569,6 @@ void sigchld(int unused)
     while (0 < waitpid(-1, NULL, WNOHANG));
 }
 
-void spawn(const Arg *arg)
-{
-    if (fork() == 0) {
-        if (fork() == 0) {
-            if (dis)
-                close(ConnectionNumber(dis));
-
-            setsid();
-            execvp(((char**)arg->com)[0], (char**)arg->com);
-        }
-        exit(0);
-    }
-}
-
 void start()
 {
     XEvent ev;
@@ -552,28 +577,6 @@ void start()
         if (ev.type < LASTEvent && events[ev.type] != NULL)
             events[ev.type](&ev);
     }
-}
-
-void swap_master()
-{
-    Window tmp;
-
-    if (head != NULL && current != NULL && current != head && mode == 0) {
-        tmp = head->win;
-        head->win = current->win;
-        current->win = tmp;
-        current = head;
-
-        tile();
-        update_current();
-    }
-}
-
-void switch_mode()
-{
-    mode = 1 - mode;
-    tile();
-    update_current();
 }
 
 void tile()
