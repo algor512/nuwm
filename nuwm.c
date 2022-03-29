@@ -23,6 +23,7 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xproto.h>
+#include <X11/Xatom.h>
 #include <X11/keysym.h>
 #include <X11/XF86keysym.h>
 #include <stdio.h>
@@ -68,6 +69,7 @@ typedef struct Client Client;
 struct Client {
     Client *next, *prev;
     Window win;
+    int isfull;
 };
 
 typedef struct Desktop Desktop;
@@ -76,8 +78,12 @@ struct Desktop{
     Client *head, *current;
 };
 
+enum { WM_PROTOCOLS, WM_DELETE_WINDOW, WM_COUNT };
+enum { NET_SUPPORTED, NET_FULLSCREEN, NET_WM_STATE, NET_ACTIVE, NET_COUNT };
+
 // Functions not visible from config.h (private)
 static void add_window(Window);
+static void clientmessage(XEvent *);
 static void configurerequest(XEvent *);
 static void destroynotify(XEvent *);
 static void die(const char *);
@@ -89,6 +95,7 @@ static void remove_window(Window);
 static void save_desktop(int);
 static void select_desktop(int);
 static void send_kill_signal(Window);
+static void setfullscreen(Client *, int);
 static void setup(void);
 static void sigchld(int);
 static void start(void);
@@ -98,7 +105,7 @@ static int xerror(Display *, XErrorEvent *);
 static int xerrorstart(Display *, XErrorEvent *);
 static Client *wintoclient(Window);
 
-// Variables
+// Global variables
 static Display *dis;
 static int bool_quit;
 static int current_desktop;
@@ -107,14 +114,16 @@ static int screen, sh, sw;
 static unsigned int win_focus, win_unfocus;
 static Window root;
 static Client *head, *current;
+static Atom wmatoms[WM_COUNT], netatoms[NET_COUNT];
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 
 // Events array
 static void (*events[LASTEvent])(XEvent *e) = {
+    [ClientMessage]    = clientmessage,
+    [ConfigureRequest] = configurerequest,
+    [DestroyNotify]    = destroynotify,
     [KeyPress]         = keypress,
     [MapRequest]       = maprequest,
-    [DestroyNotify]    = destroynotify,
-    [ConfigureRequest] = configurerequest
 };
 
 // Desktop array
@@ -173,13 +182,12 @@ void client_to_desktop(const Arg *arg)
 void kill_client(const Arg *arg)
 {
     if (current != NULL) {
-        //send delete signal to window
         XEvent ke;
         ke.type = ClientMessage;
         ke.xclient.window = current->win;
-        ke.xclient.message_type = XInternAtom(dis, "WM_PROTOCOLS", True);
         ke.xclient.format = 32;
-        ke.xclient.data.l[0] = XInternAtom(dis, "WM_DELETE_WINDOW", True);
+        ke.xclient.message_type = wmatoms[WM_PROTOCOLS];
+        ke.xclient.data.l[0] = wmatoms[WM_DELETE_WINDOW];
         ke.xclient.data.l[1] = CurrentTime;
         XSendEvent(dis, current->win, False, NoEventMask, &ke);
         send_kill_signal(current->win);
@@ -337,7 +345,7 @@ void add_window(Window w)
     Client *c, *t;
 
     if (!(c = (Client *)calloc(1, sizeof(Client))))
-        die("Error calloc!");
+        die("calloc");
 
     if (head == NULL) {
         c->next = NULL;
@@ -356,6 +364,17 @@ void add_window(Window w)
     }
 
     current = c;
+}
+
+void clientmessage(XEvent *e)
+{
+    Client *c;
+    XClientMessageEvent *ev = &e->xclient;
+    if ((c = wintoclient(ev->window)) == NULL)
+        return;
+    if (ev->message_type == netatoms[NET_WM_STATE]
+            && ((unsigned)ev->data.l[1] == netatoms[NET_FULLSCREEN] || (unsigned)ev->data.l[2] == netatoms[NET_FULLSCREEN]))
+        setfullscreen(c, (ev->data.l[0] == 1 || (ev->data.l[0] == 2 && !c->isfull)));
 }
 
 void configurerequest(XEvent *e)
@@ -399,7 +418,7 @@ unsigned long getcolor(const char *color)
     Colormap map = DefaultColormap(dis, screen);
 
     if (!XAllocNamedColor(dis, map, color, &c, &c))
-        die("Error parsing color!");
+        die("error parsing color");
 
     return c.pixel;
 }
@@ -409,7 +428,7 @@ void grabkeys()
     int i;
     KeyCode code;
 
-    // For each shortcuts
+    XUngrabKey(dis, AnyKey, AnyModifier, root);
     for (i = 0; i < TABLENGTH(keys); ++i)
         if ((code = XKeysymToKeycode(dis, keys[i].keysym)))
             XGrabKey(dis, code, keys[i].mod, root, True, GrabModeAsync, GrabModeAsync);
@@ -499,17 +518,31 @@ void send_kill_signal(Window w)
     XEvent ke;
     ke.type = ClientMessage;
     ke.xclient.window = w;
-    ke.xclient.message_type = XInternAtom(dis, "WM_PROTOCOLS", True);
     ke.xclient.format = 32;
-    ke.xclient.data.l[0] = XInternAtom(dis, "WM_DELETE_WINDOW", True);
+    ke.xclient.message_type = wmatoms[WM_PROTOCOLS];
+    ke.xclient.data.l[0] = wmatoms[WM_DELETE_WINDOW];
     ke.xclient.data.l[1] = CurrentTime;
     XSendEvent(dis, w, False, NoEventMask, &ke);
+}
+
+void setfullscreen(Client *c, int fullscreen)
+{
+    if (fullscreen != c->isfull)
+        XChangeProperty(dis, c->win, netatoms[NET_WM_STATE], XA_ATOM, 32, PropModeReplace,
+                (unsigned char*)((c->isfull = fullscreen) ? &netatoms[NET_FULLSCREEN] : 0), fullscreen);
+    if (fullscreen) {
+        XMoveResizeWindow(dis, c->win, 0, 0, sw, sh);
+        XSetWindowBorderWidth(dis, c->win, 0);
+    } else {
+        tile();
+        update_current();
+    }
 }
 
 void setup()
 {
     if ((dis = XOpenDisplay(NULL)) == NULL)
-        die("cannot open display!");
+        die("cannot open display");
 
     // Error handling
     xerrorxlib = XSetErrorHandler(xerrorstart);
@@ -532,6 +565,19 @@ void setup()
     // Colors
     win_focus = getcolor(FOCUS);
     win_unfocus = getcolor(UNFOCUS);
+
+    // thx to monsterwm
+    // set up atoms for dialog/notification windows
+    wmatoms[WM_PROTOCOLS]     = XInternAtom(dis, "WM_PROTOCOLS", False);
+    wmatoms[WM_DELETE_WINDOW] = XInternAtom(dis, "WM_DELETE_WINDOW", False);
+    netatoms[NET_SUPPORTED]   = XInternAtom(dis, "_NET_SUPPORTED", False);
+    netatoms[NET_WM_STATE]    = XInternAtom(dis, "_NET_WM_STATE", False);
+    netatoms[NET_ACTIVE]      = XInternAtom(dis, "_NET_ACTIVE_WINDOW", False);
+    netatoms[NET_FULLSCREEN]  = XInternAtom(dis, "_NET_WM_STATE_FULLSCREEN", False);
+
+    // propagate EWMH support
+    XChangeProperty(dis, root, netatoms[NET_SUPPORTED], XA_ATOM, 32,
+            PropModeReplace, (unsigned char *)netatoms, NET_COUNT);
 
     // Shortcuts
     grabkeys();
@@ -659,7 +705,7 @@ int xerror(Display *dpy, XErrorEvent *ee)
 
 int xerrorstart(Display *dpy, XErrorEvent *ee)
 {
-    die("Another window manager is already running!");
+    die("another window manager is already running");
     return 1;
 }
 
