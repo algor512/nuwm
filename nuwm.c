@@ -69,7 +69,7 @@ typedef struct Client Client;
 struct Client {
     Client *next, *prev;
     Window win;
-    int isfull;
+    int isfull, isfloat;
 };
 
 typedef struct Desktop Desktop;
@@ -91,6 +91,7 @@ static unsigned long getcolor(const char *);
 static void grabkeys(void);
 static void keypress(XEvent *);
 static void maprequest(XEvent *);
+static Client *nexttiled(Client *);
 static void remove_window(Window);
 static void save_desktop(int);
 static void select_desktop(int);
@@ -462,6 +463,12 @@ void maprequest(XEvent *e)
     update_current();
 }
 
+Client *nexttiled(Client *c)
+{
+    for (; c && c->isfloat; c = c->next);
+    return c;
+}
+
 void remove_window(Window w)
 {
     Client *c;
@@ -529,11 +536,13 @@ void setfullscreen(Client *c, int fullscreen)
 {
     if (fullscreen != c->isfull)
         XChangeProperty(dis, c->win, netatoms[NET_WM_STATE], XA_ATOM, 32, PropModeReplace,
-                (unsigned char*)((c->isfull = fullscreen) ? &netatoms[NET_FULLSCREEN] : 0), fullscreen);
+                (unsigned char*)(fullscreen ? &netatoms[NET_FULLSCREEN] : 0), fullscreen);
     if (fullscreen) {
+        c->isfull = c->isfloat = 1;
         XMoveResizeWindow(dis, c->win, 0, 0, sw, sh);
         XSetWindowBorderWidth(dis, c->win, 0);
     } else {
+        c->isfull = c->isfloat = 0;
         tile();
         update_current();
     }
@@ -627,38 +636,38 @@ void start()
 
 void tile()
 {
-    if (head == NULL)
+    Client *c, *tmp_head;
+    if ((c = tmp_head = nexttiled(head)) == NULL)
         return;
 
-    Client *c;
     int n = 0, x = GAP, y = GAP;
     int w = sw - VACUUM, h = sh - VACUUM;
 
     // If only one window
-    if (head->next == NULL)
-        XMoveResizeWindow(dis, head->win, x, y, w, h);
+    if (nexttiled(tmp_head->next) == NULL)
+        XMoveResizeWindow(dis, tmp_head->win, x, y, w, h);
     else {
         switch (mode) {
             case 0:
                 // Master window
                 w = master_size - VACUUM + GAP / 2;
                 h = sh - VACUUM;
-                XMoveResizeWindow(dis, head->win, x, y, w, h);
+                XMoveResizeWindow(dis, tmp_head->win, x, y, w, h);
 
                 // Stack
-                for (c = head->next; c; c = c->next)
+                for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next))
                     ++n;
                 // x, w and h are constant for windows in the stack
                 x = master_size + GAP / 2;
                 w = sw - master_size - VACUUM + GAP / 2;
                 h = (sh - 2 * n * BORDER - n * GAP - GAP) / n;
-                for (c = head->next; c; c = c->next) {
+                for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next)) {
                     XMoveResizeWindow(dis, c->win, x, y, w, h);
                     y += h + VACUUM - GAP;
                 }
                 break;
             case 1:
-                for (c = head; c; c = c->next)
+                for (c = tmp_head; c; c = nexttiled(c->next))
                     XMoveResizeWindow(dis, c->win, x, y, w, h);
                 break;
             default:
@@ -674,12 +683,14 @@ void update_current()
     for (c = head; c; c = c->next)
         if (current == c) {
             // "Enable" current window
-            XSetWindowBorderWidth(dis, c->win, BORDER);
-            XSetWindowBorder(dis, c->win, win_focus);
+            if (!c->isfull) {
+                XSetWindowBorderWidth(dis, c->win, BORDER);
+                XSetWindowBorder(dis, c->win, win_focus);
+            }
             XSetInputFocus(dis, c->win, RevertToParent, CurrentTime);
             XRaiseWindow(dis, c->win);
         }
-        else
+        else if (!c->isfull)
             XSetWindowBorder(dis, c->win, win_unfocus);
 }
 
