@@ -60,6 +60,7 @@ static void resize_master(const Arg *);
 static void spawn(const Arg *);
 static void swap_master(const Arg *);
 static void switch_mode(const Arg *);
+static void toggle_float(const Arg *);
 
 #include "config.h"
 #define VACUUM (2 * (BORDER + GAP))
@@ -338,6 +339,17 @@ void switch_mode(const Arg *arg)
     mode = 1 - mode;
     tile();
     update_current();
+}
+
+void toggle_float(const Arg *arg)
+{
+    if (current == NULL)
+        return;
+
+    if (!current->isfloat)
+        XMoveResizeWindow(dis, current->win, 50, 50, sw / 2, sh / 2);
+    current->isfloat = !current->isfloat;
+    tile();
 }
 
 // Implementation of private functions
@@ -619,7 +631,7 @@ void sigchld(int unused)
 {
     // Again, thx to dwm ;)
     if (signal(SIGCHLD, sigchld) == SIG_ERR)
-        die("Can't install SIGCHLD handler");
+        die("can't install SIGCHLD handler");
 
     while (0 < waitpid(-1, NULL, WNOHANG));
 }

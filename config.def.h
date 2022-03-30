@@ -29,6 +29,7 @@ static struct Key keys[] = {
     { MOD,                    XK_q,          kill_client,    { NULL }             },
     { MOD,                    XK_j,          next_win,       { NULL }             },
     { MOD,                    XK_k,          prev_win,       { NULL }             },
+    { MOD,                    XK_f,          toggle_float,   { NULL }             },
     { MOD|ShiftMask,          XK_j,          move_down,      { NULL }             },
     { MOD|ShiftMask,          XK_k,          move_up,        { NULL }             },
     { MOD|ShiftMask,          XK_Return,     swap_master,    { NULL }             },
