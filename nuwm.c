@@ -198,7 +198,7 @@ void kill_client(const Arg *arg)
 
 void move_down(const Arg *arg)
 {
-    if (current == NULL || current->next == NULL || current->win == head->win || current->prev == NULL)
+    if (current == NULL || current->next == NULL)
         return;
 
     Window tmp = current->win;
@@ -212,7 +212,7 @@ void move_down(const Arg *arg)
 
 void move_up(const Arg *arg)
 {
-    if (current == NULL || current->prev == head || current->win == head->win)
+    if (current == NULL || current->win == head->win)
         return;
 
     Window tmp = current->win;
@@ -225,32 +225,34 @@ void move_up(const Arg *arg)
 
 void next_win(const Arg *arg)
 {
+    if (current == NULL || head == NULL)
+        return;
+
     Client *c;
 
-    if (current != NULL && head != NULL) {
-        if(current->next == NULL)
-            c = head;
-        else
-            c = current->next;
+    if (current->next == NULL)
+        c = head;
+    else
+        c = current->next;
 
-        current = c;
-        update_current();
-    }
+    current = c;
+    update_current();
 }
 
 void prev_win(const Arg *arg)
 {
+    if (current == NULL || head == NULL)
+        return;
+
     Client *c;
 
-    if (current != NULL && head != NULL) {
-        if (current->prev == NULL)
-            for (c = head; c->next; c = c->next);
-        else
-            c = current->prev;
+    if (current->prev == NULL)
+        for (c = head; c->next; c = c->next);
+    else
+        c = current->prev;
 
-        current = c;
-        update_current();
-    }
+    current = c;
+    update_current();
 }
 
 void quit(const Arg *arg)
@@ -321,17 +323,18 @@ void spawn(const Arg *arg)
 
 void swap_master(const Arg *arg)
 {
+    if (head == NULL || current == NULL || current == head || mode == 0)
+        return;
+
     Window tmp;
 
-    if (head != NULL && current != NULL && current != head && mode == 0) {
-        tmp = head->win;
-        head->win = current->win;
-        current->win = tmp;
-        current = head;
+    tmp = head->win;
+    head->win = current->win;
+    current->win = tmp;
+    current = head;
 
-        tile();
-        update_current();
-    }
+    tile();
+    update_current();
 }
 
 void switch_mode(const Arg *arg)
@@ -383,6 +386,7 @@ void clientmessage(XEvent *e)
 {
     Client *c;
     XClientMessageEvent *ev = &e->xclient;
+
     if ((c = wintoclient(ev->window)) == NULL)
         return;
     if (ev->message_type == netatoms[NET_WM_STATE]
