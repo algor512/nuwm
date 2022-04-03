@@ -323,7 +323,7 @@ void spawn(const Arg *arg)
 
 void swap_master(const Arg *arg)
 {
-    if (head == NULL || current == NULL || current == head || mode == 0)
+    if (head == NULL || current == NULL || current->win == head->win)
         return;
 
     Window tmp;
