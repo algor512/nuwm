@@ -22,26 +22,17 @@ and monocle mode.
 
 After making your changes in `config.h`:
 
-```
+```sh
 $ make
 # make install
 ```
 
 By default `nuwm` is installed to `/usr/local/bin`. You can change this in the `Makefile`.
 
-## Bugs
-
-I'm working on fixing the following bugs:
-
-- dunst notifications get placed behind all windows when switching desktops
-
 ## Todo
 
 - Multiple desktop view
-- Window rules
-- Increase/decrease number of master windows function
 - Log desktop info to stdout to be used by bars that work with stdin
-- Multiple monitors support
 
 # References
 
