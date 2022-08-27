@@ -22,10 +22,13 @@
  */
 
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <X11/Xproto.h>
 #include <X11/Xatom.h>
+#include <X11/XKBlib.h>
 #include <X11/XF86keysym.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -44,6 +47,13 @@ struct Key {
     KeySym keysym;
     void (*function)(const Arg *arg);
     const Arg arg;
+};
+
+struct Rule {
+    const char *class;
+    const int isfloat;
+	const int xkb_lock;
+	const int xkb_lock_group;
 };
 
 
@@ -71,6 +81,7 @@ struct Client {
     Client *next, *prev;
     Window win;
     int isfull, isfloat;
+	int xkb_lock, xkb_lock_group;
 };
 
 typedef struct Desktop Desktop;
@@ -83,7 +94,7 @@ enum { WM_PROTOCOLS, WM_DELETE_WINDOW, WM_COUNT };
 enum { NET_SUPPORTED, NET_FULLSCREEN, NET_WM_STATE, NET_ACTIVE, NET_COUNT };
 
 // Functions not visible from config.h (private)
-static void add_window(Window);
+static Client *add_window(Window);
 static void clientmessage(XEvent *);
 static void configurerequest(XEvent *);
 static void destroynotify(XEvent *);
@@ -106,6 +117,7 @@ static void update_current(void);
 static void write_info(void);
 static int xerror(Display *, XErrorEvent *);
 static int xerrorstart(Display *, XErrorEvent *);
+static void xkbevent(XEvent *);
 static Client *wintoclient(Window);
 
 // Global variables
@@ -119,6 +131,8 @@ static Window root;
 static Client *head, *current;
 static Atom wmatoms[WM_COUNT], netatoms[NET_COUNT];
 static int (*xerrorxlib)(Display *, XErrorEvent *);
+static int xkb_group = 0;
+static int xkb_event_type = 0;
 
 // Events array
 static void (*events[LASTEvent])(XEvent *e) = {
@@ -358,7 +372,7 @@ void toggle_float(const Arg *arg)
 }
 
 // Implementation of private functions
-void add_window(Window w)
+Client *add_window(Window w)
 {
     Client *c, *t;
 
@@ -382,6 +396,7 @@ void add_window(Window w)
     }
 
     current = c;
+    return c;
 }
 
 void clientmessage(XEvent *e)
@@ -475,8 +490,23 @@ void maprequest(XEvent *e)
         return;
     }
 
-    add_window(ev->window);
-    XMapWindow(dis,ev->window);
+    c = add_window(ev->window);
+    XMapWindow(dis, ev->window);
+
+    XClassHint cls;
+    if (XGetClassHint(dis, ev->window, &cls)) {
+	    for (int i = 0; i < TABLENGTH(rules); i++) {
+		    if (strstr(cls.res_class, rules[i].class) || strstr(cls.res_name, rules[i].class)) {
+				c->xkb_lock = rules[i].xkb_lock;
+				c->xkb_lock_group = rules[i].xkb_lock_group;
+				c->isfloat = rules[i].isfloat;
+			    break;
+		    }
+	    }
+    }
+    if (cls.res_class) XFree(cls.res_class);
+    if (cls.res_name) XFree(cls.res_name);
+
     tile();
     update_current();
     write_info();
@@ -633,6 +663,15 @@ void setup()
 
     // To catch maprequest and destroynotify (if other wm running)
     XSelectInput(dis, root, SubstructureNotifyMask|SubstructureRedirectMask);
+
+	/* XKB extension configuration */
+    XkbStateRec xkb_state;
+	if (!XkbQueryExtension(dis, NULL, &xkb_event_type, NULL, NULL, NULL)) {
+		die("can not query xkb extension");
+	}
+	XkbSelectEventDetails(dis, XkbUseCoreKbd, XkbStateNotify, XkbAllStateComponentsMask, XkbGroupStateMask);
+	XkbGetState(dis, XkbUseCoreKbd, &xkb_state);
+	xkb_group = xkb_state.locked_group;
 }
 
 void sigchld(int unused)
@@ -652,6 +691,9 @@ void start()
     while (!bool_quit && !XNextEvent(dis, &ev)) {
         if (ev.type < LASTEvent && events[ev.type] != NULL)
             events[ev.type](&ev);
+        else if (ev.type == xkb_event_type) {
+	        xkbevent(&ev);
+        }
     }
 }
 
@@ -750,6 +792,39 @@ int xerrorstart(Display *dpy, XErrorEvent *ee)
 {
     die("another window manager is already running");
     return 1;
+}
+
+void xkbevent(XEvent *e)
+{
+	XkbEvent *ev = (XkbEvent *) e;
+	if (ev->any.xkb_type == XkbStateNotify) {
+		int group = ev->state.locked_group;
+		if (current != NULL) {
+			if (!current->xkb_lock) {
+				xkb_group = group;
+			} else if (group != current->xkb_lock_group) {
+				XkbLockGroup(dis, XkbUseCoreKbd, current->xkb_lock_group);
+
+				XKeyEvent key_ev = {
+					.type = KeyPress,
+					.window = current->win,
+					.display = dis,
+					.root = root,
+					.state = 0,
+					.keycode = 250,
+				};
+
+				XSendEvent(dis, key_ev.window, False, 0, (XEvent *)&key_ev);
+				XSync(dis, False);
+
+				key_ev.type = KeyRelease;
+				XSendEvent(dis, key_ev.window, False, 0, (XEvent *)&key_ev);
+				XSync(dis, False);
+			}
+		} else {
+			xkb_group = group;
+		}
+	}
 }
 
 Client *wintoclient(Window w)
