@@ -24,7 +24,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xproto.h>
 #include <X11/Xatom.h>
-#include <X11/keysym.h>
 #include <X11/XF86keysym.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -46,6 +45,7 @@ struct Key {
     void (*function)(const Arg *arg);
     const Arg arg;
 };
+
 
 // Functions visible from config.h (public)
 static void change_desktop(const Arg *);
@@ -103,6 +103,7 @@ static void sigchld(int);
 static void start(void);
 static void tile(void);
 static void update_current(void);
+static void write_info(void);
 static int xerror(Display *, XErrorEvent *);
 static int xerrorstart(Display *, XErrorEvent *);
 static Client *wintoclient(Window);
@@ -179,6 +180,7 @@ void client_to_desktop(const Arg *arg)
 
     tile();
     update_current();
+    write_info();
 }
 
 void kill_client(const Arg *arg)
@@ -420,7 +422,7 @@ void destroynotify(XEvent *e)
         tile();
         update_current();
     }
-
+    write_info();
 }
 
 void die(const char *e)
@@ -477,6 +479,7 @@ void maprequest(XEvent *e)
     XMapWindow(dis,ev->window);
     tile();
     update_current();
+    write_info();
 }
 
 Client *nexttiled(Client *c)
@@ -534,6 +537,7 @@ void select_desktop(int i)
     master_size = desktops[i].master_size;
     mode = desktops[i].mode;
     current_desktop = i;
+    write_info();
 }
 
 void send_kill_signal(Window w)
@@ -644,6 +648,7 @@ void start()
 {
     XEvent ev;
 
+    write_info();
     while (!bool_quit && !XNextEvent(dis, &ev)) {
         if (ev.type < LASTEvent && events[ev.type] != NULL)
             events[ev.type](&ev);
@@ -708,6 +713,17 @@ void update_current()
         }
         else if (!c->isfull)
             XSetWindowBorder(dis, c->win, win_unfocus);
+}
+
+void write_info(void) {
+    for (int i = 0; i < DESKTOPS_SIZE; ++i) {
+	    int nclients = 0;
+	    for (Client *c = desktops[i].head; c != NULL; c = c->next) {
+		    ++nclients;
+	    }
+	    printf("%d:%d:%d%c", i, desktops[i].mode, nclients, i == DESKTOPS_SIZE - 1 ? '\n' : ' ');
+    }
+    fflush(stdout);
 }
 
 int xerror(Display *dpy, XErrorEvent *ee)
