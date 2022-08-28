@@ -34,6 +34,8 @@
 #include <signal.h>
 #include <sys/wait.h>
 
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
 #define TABLENGTH(x) (sizeof(x)/sizeof(*x))
 
 // Types visible from config.h
@@ -73,7 +75,6 @@ static void switch_mode(const Arg *);
 static void toggle_float(const Arg *);
 
 #include "config.h"
-#define VACUUM (2 * (BORDER + GAP))
 
 // Types not visible from config.h (public)
 typedef struct Client Client;
@@ -90,6 +91,7 @@ struct Desktop{
     Client *head, *current;
 };
 
+enum { MONOCLE, VSTACK, HSTACK, MODE };
 enum { WM_PROTOCOLS, WM_DELETE_WINDOW, WM_COUNT };
 enum { NET_SUPPORTED, NET_FULLSCREEN, NET_WM_STATE, NET_ACTIVE, NET_COUNT };
 
@@ -316,11 +318,8 @@ void resize_master(const Arg *arg)
     if (!arg || !arg->i)
         return;
 
-    int new_size = master_size + arg->i;
-    if (50 < new_size && new_size < sw - 50) {
-        master_size = new_size;
-        tile();
-    }
+    master_size = MIN(MAX(master_size + arg->i, 10), 90);
+    tile();
 }
 
 void spawn(const Arg *arg)
@@ -355,7 +354,7 @@ void swap_master(const Arg *arg)
 
 void switch_mode(const Arg *arg)
 {
-    mode = 1 - mode;
+	mode = (mode + 1) % MODE;
     tile();
     update_current();
 }
@@ -646,7 +645,7 @@ void setup()
     bool_quit = 0;
     head = NULL;
     current = NULL;
-    master_size = sw * MASTER_SIZE;
+    master_size = MASTER_SIZE;
 
     // Set up all desktop
     for (int i = 0; i < DESKTOPS_SIZE; ++i) {
@@ -703,39 +702,63 @@ void tile()
     if ((c = tmp_head = nexttiled(head)) == NULL)
         return;
 
-    int n = 0, x = GAP, y = GAP;
-    int w = sw - VACUUM, h = sh - VACUUM;
-
+    int w, h, n, x, y;
+    int ms;
     // If only one window
     if (nexttiled(tmp_head->next) == NULL)
-        XMoveResizeWindow(dis, tmp_head->win, x, y, w, h);
+	    XMoveResizeWindow(dis, tmp_head->win, 0, 0, sw - 2*BORDER, sh - 2*BORDER);
     else {
-        switch (mode) {
-            case 0:
-                // Master window
-                w = master_size - VACUUM + GAP / 2;
-                h = sh - VACUUM;
-                XMoveResizeWindow(dis, tmp_head->win, x, y, w, h);
+	    switch (mode) {
+	    case VSTACK:
+		    ms = master_size * (sw - 2*BORDER - GAP) / 100;
+		    // Master window
+		    w = ms - 2*BORDER;
+		    h = sh - 2*BORDER;
+		    XMoveResizeWindow(dis, tmp_head->win, 0, 0, w, h);
 
-                // Stack
-                for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next))
-                    ++n;
-                // x, w and h are constant for windows in the stack
-                x = master_size + GAP / 2;
-                w = sw - master_size - VACUUM + GAP / 2;
-                h = (sh - 2 * n * BORDER - n * GAP - GAP) / n;
-                for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next)) {
-                    XMoveResizeWindow(dis, c->win, x, y, w, h);
-                    y += h + VACUUM - GAP;
-                }
-                break;
-            case 1:
-                for (c = tmp_head; c; c = nexttiled(c->next))
-                    XMoveResizeWindow(dis, c->win, x, y, w, h);
-                break;
-            default:
-                break;
-        }
+		    // Stack
+		    n = 0;
+		    for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next))
+			    ++n;
+
+		    // x, w and h are constant for windows in the stack
+		    x = ms + 2*BORDER + GAP;
+		    y = 0;
+		    w = sw - ms - 4*BORDER - GAP;
+		    h = (sh - 2*n*BORDER - (n - 1)*GAP) / n;
+		    for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next)) {
+			    XMoveResizeWindow(dis, c->win, x, y, w, h);
+			    y += h + 2*BORDER + GAP;
+		    }
+		    break;
+	    case HSTACK:
+		    ms = master_size * (sh - 2*BORDER - GAP) / 100;
+		    // Stack
+		    n = 0;
+		    for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next))
+			    ++n;
+
+		    // x, w and h are constant for windows in the stack
+		    x = 0;
+		    h = sh - ms - 4*BORDER - GAP;
+		    w = (sw - 2*n*BORDER - (n - 1)*GAP) / n;
+		    for (c = nexttiled(tmp_head->next); c; c = nexttiled(c->next)) {
+			    XMoveResizeWindow(dis, c->win, x, 0, w, h);
+			    x += w + 2*BORDER + GAP;
+		    }
+
+		    // Master window
+		    w = sw - 2*BORDER;
+		    h = ms - 2*BORDER;
+		    XMoveResizeWindow(dis, tmp_head->win, 0, sh - ms - 2*BORDER, w, h);
+		    break;
+	    case MONOCLE:
+		    for (c = tmp_head; c; c = nexttiled(c->next))
+			    XMoveResizeWindow(dis, c->win, 0, 0, sw - 2*BORDER, sh - 2*BORDER);
+		    break;
+	    default:
+		    break;
+	    }
     }
 }
 
