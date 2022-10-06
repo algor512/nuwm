@@ -4,8 +4,8 @@ X11LIB = /usr/X11R6/lib
 INCS = -I${X11INC}
 LIBS = -L${X11LIB} -lX11
 
-CFLAGS = -std=c99 -pedantic -Wall -Wno-deprecated-declarations -Os ${INCS}
-LDFLAGS = ${LIBS}
+CFLAGS = -std=c99 -O0 -g -pedantic -Wall -Wno-deprecated-declarations ${INCS}
+LDFLAGS = -g ${LIBS}
 
 PREFIX = /usr/local
 BINDIR = ${PREFIX}/bin
