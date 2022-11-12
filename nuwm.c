@@ -165,11 +165,15 @@ void change_desktop(const Arg *arg)
 {
 	if (arg->i < 1 || arg->i == current_desktop) return;
 	LOG("change desktop: %d -> %d", current_desktop, arg->i);
-	current_desktop = arg->i;
+
 	for (int i = 1; i < DESKTOPS_SIZE; ++i) {
-		if (i == current_desktop) continue;
-		for (Client *c = desktops[i].head; c != NULL; c = c->next) XMoveWindow(dis, c->win, 0, sh + 5);
+		if (i == arg->i) continue;
+		for (Client *c = desktops[i].head; c != NULL; c = c->next) {
+			if (i != current_desktop || desktops[i].current != c) XMoveWindow(dis, c->win, 0, sh + 5);
+		}
 	}
+	if (desktops[current_desktop].current != NULL) XMoveWindow(dis, desktops[current_desktop].current->win, 0, sh + 5);
+	current_desktop = arg->i;
 
 	tile();
 	write_info();
@@ -182,6 +186,7 @@ void client_to_desktop(const Arg *arg)
 	Client *current = desktops[current_desktop].current;
 	LOG("client to desktop: %d -> %d, client = %p", current_desktop, arg->i, (void *) current);
 
+	XMoveWindow(dis, current->win, 0, sh + 5);
 	copy_client(current, arg->i);
 	remove_client(current, current_desktop);
 
@@ -564,7 +569,7 @@ void copy_client(Client *c, int desktop)
 		desktops[desktop].head = new;
 	} else if (current == desktops[desktop].head) {
 		new->next = current;
-                desktops[desktop].head = new;
+		desktops[desktop].head = new;
 	} else {
 		Client *prev = desktops[desktop].head;
 		for (; prev->next != current && prev->next != NULL; prev = prev->next);
@@ -830,18 +835,19 @@ void start()
 
 	write_info();
 	while (!bool_quit && !XNextEvent(dis, &ev)) {
-          LOG("event loop iteration");
-          if (ev.type < LASTEvent && events[ev.type] != NULL) {
-            events[ev.type](&ev);
-          } else if (ev.type == xkb_event_type) {
-            xkbevent(&ev);
-          }
-        }
+		LOG("event loop iteration");
+		if (ev.type < LASTEvent && events[ev.type] != NULL) {
+			events[ev.type](&ev);
+		} else if (ev.type == xkb_event_type) {
+			xkbevent(&ev);
+		}
+	}
 }
 
 void tile()
 {
 	Client *master = NULL;
+	Client *current = desktops[current_desktop].current;
 	int stack_size = 0;
 
 	for (Client *c = desktops[current_desktop].head; c != NULL; c = c->next) {
@@ -908,6 +914,10 @@ void tile()
 
 			break;
 		case MONOCLE:
+			if (current != NULL && !current->isfloat) {
+				XSetWindowBorderWidth(dis, current->win, 0);
+				XMoveResizeWindow(dis, current->win, 0, BAR, sw, sh - BAR);
+			}
 			for (Client *c = master; c != NULL; c = c->next) {
 				if (c->isfloat) continue;
 				XSetWindowBorderWidth(dis, c->win, 0);
