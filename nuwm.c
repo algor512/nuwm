@@ -852,7 +852,11 @@ void tile()
 
 	for (Client *c = desktops[current_desktop].head; c != NULL; c = c->next) {
 		if (c->isfloat) {
-			XSetWindowBorderWidth(dis, c->win, BORDER);
+			if (c->isfull) {
+				XSetWindowBorderWidth(dis, c->win, 0);
+			} else {
+				XSetWindowBorderWidth(dis, c->win, BORDER);
+			}
 			XMoveResizeWindow(dis, c->win, c->x, c->y, c->w, c->h);
 		} else {
 			if (master == NULL) {
