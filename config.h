@@ -21,10 +21,8 @@ const unsigned int ignored_modifiers[] = {LockMask, Mod2Mask, Mod3Mask, Mod5Mask
 const char* runcmd[] =        { "termenu_run", NULL };
 const char* passcmd[] =       { "passman", NULL };
 const char* wificmd[] =       { "wifiman", NULL };
-const char* scratchpad[] =    { "scratchpad", NULL };
-
+const char* emacscmd[] =      { "emacsclient", "-ca", "", NULL };
 const char* termcmd[] =       { "st", NULL };
-const char* emacscmd[] =      { "emacs", NULL };
 const char* flameshotcmd[] =  { "flameshot", "gui", NULL };
 
 const struct Rule rules[] = {
@@ -49,7 +47,6 @@ static struct Key keys[] = {
 	{ MOD,                    XK_r,          spawn_script,   { .com = runcmd }      },
 	{ MOD,                    XK_p,          spawn_script,   { .com = passcmd }     },
 	{ MOD,                    XK_n,          spawn_script,   { .com = wificmd }     },
-	{ MOD,                    XK_s,          spawn_script,   { .com = scratchpad }  },
 	{ MOD,                    XK_e,          spawn,          { .com = emacscmd }    },
 	{ MOD,                    XK_Return,     spawn,          { .com = termcmd }     },
 	{ 0,                      XK_Print,      spawn,          { .com = flameshotcmd }},
