@@ -26,9 +26,9 @@ const char* termcmd[] =       { "st", NULL };
 const char* flameshotcmd[] =  { "flameshot", "gui", NULL };
 
 const struct Rule rules[] = {
-	// class          floating    xkb_lock     xkb_lock_group
-	{ "Emacs",        0,          1,           0              },
-	{ "float-term",   1,          0,           0,             }
+	// class                 floating    xkb_lock     xkb_lock_group
+	{ "Emacs",               0,          1,           0              },
+	{ "float-term",          1,          0,           0,             }
 };
 
 #define DESKTOPCHANGE(KEY, TAG)                                         \

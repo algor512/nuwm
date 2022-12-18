@@ -215,7 +215,7 @@ void next_win(const Arg *arg)
 {
 	Client *current = desktops[current_desktop].current;
 	Client *head = desktops[current_desktop].head;
-	if (current == NULL || head == NULL) return;
+	if (current == NULL || head == NULL || current->isfull) return;
 
 	Client *next = current->next;
 	if (next == NULL) next = head;
@@ -228,7 +228,7 @@ void prev_win(const Arg *arg)
 {
 	Client *current = desktops[current_desktop].current;
 	Client *head = desktops[current_desktop].head;
-	if (current == NULL || head == NULL) return;
+	if (current == NULL || head == NULL || current->isfull) return;
 
 	Client *prev = head;
 	for (; prev->next != current && prev->next != NULL; prev = prev->next);
@@ -507,6 +507,7 @@ void maprequest(XEvent *e)
 			}
 		}
 	}
+
 	if (cls.res_class) XFree(cls.res_class);
 	if (cls.res_name) XFree(cls.res_name);
 	if (c.isfloat) {
