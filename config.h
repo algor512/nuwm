@@ -26,9 +26,10 @@ const char* termcmd[] =       { "st", NULL };
 const char* flameshotcmd[] =  { "flameshot", "gui", NULL };
 
 const struct Rule rules[] = {
-	// class                 floating    xkb_lock     xkb_lock_group
-	{ "Emacs",               0,          1,           0              },
-	{ "float-term",          1,          0,           0,             }
+	// class                 floating   fullscreen   xkb_lock     xkb_lock_group  ignore unmap
+	{ "Emacs",               0,         0,           1,           0,              0 },
+	{ "float-term",          1,         0,           0,           0,              0 },
+	{ "7DaysToDie.x86_64",   1,         1,           0,           0,              1 }
 };
 
 #define DESKTOPCHANGE(KEY, TAG)                                         \

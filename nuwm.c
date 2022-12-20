@@ -58,8 +58,10 @@ struct Key {
 struct Rule {
 	const char *class;
 	const int isfloat;
+	const int isfull;
 	const int xkb_lock;
 	const int xkb_lock_group;
+	const int ignore_unmaps;
 };
 
 
@@ -88,6 +90,7 @@ struct Client {
 	Window win;
 	int isfull, isfloat;
 	int xkb_lock, xkb_lock_group;
+	int ignore_unmaps;
 
 	int x, y, w, h; /* to save position of floating windows */
 };
@@ -147,7 +150,6 @@ static unsigned long getcolor(const char *);
 static void grabkeys(void);
 static void move_resize_floating(Client *, int, int, int, int);
 static void remove_client(Client *, int);
-static void remove_window(Window);
 static void send_kill_signal(Window);
 static void setfullscreen(Client *, int);
 static void setup(void);
@@ -453,16 +455,26 @@ void configurerequest(XEvent *e)
 void destroynotify(XEvent *e)
 {
 	XDestroyWindowEvent *ev = &e->xdestroywindow;
+	Client *c = NULL;
+	int desktop;
+
 	LOG("destroynotify win=%lu", ev->window);
-	remove_window(ev->window);
+	if (wintoclient(ev->window, &c, &desktop)) {
+		remove_client(c, desktop);
+	}
 	tile();
 }
 
 void unmapnotify(XEvent *e)
 {
 	XUnmapEvent *ev = &e->xunmap;
+	Client *c;
+	int desktop;
+
 	LOG("unmapnotify win=%lu", ev->window);
-	remove_window(ev->window);
+	if (!wintoclient(ev->window, &c, &desktop)) return;
+	if (c->ignore_unmaps) return;
+	remove_client(c, desktop);
 	tile();
 }
 
@@ -503,6 +515,8 @@ void maprequest(XEvent *e)
 				c.xkb_lock = rules[i].xkb_lock;
 				c.xkb_lock_group = rules[i].xkb_lock_group;
 				c.isfloat = rules[i].isfloat;
+				c.isfull = rules[i].isfull;
+				c.ignore_unmaps = rules[i].ignore_unmaps;
 				break;
 			}
 		}
@@ -510,7 +524,9 @@ void maprequest(XEvent *e)
 
 	if (cls.res_class) XFree(cls.res_class);
 	if (cls.res_name) XFree(cls.res_name);
-	if (c.isfloat) {
+	if (c.isfull) {
+		setfullscreen(&c, 1);
+	} else if (c.isfloat) {
 		c.x = attrs.x;
 		c.y = attrs.y;
 		c.w = attrs.width;
@@ -692,7 +708,7 @@ void move_resize_floating(Client *c, int x, int y, int w, int h)
 
 void remove_client(Client *c, int desktop)
 {
-	LOG("remove client=%p desktop=%d", (void *) c, desktop);
+	LOG("remove client=%p win=%lu desktop=%d", (void *) c, c->win, desktop);
 	if (c == NULL) return;
 
 	Client *head = desktops[desktop].head;
@@ -704,22 +720,13 @@ void remove_client(Client *c, int desktop)
 		if (prev->next == NULL) die("something wrong with clients list");
 		prev->next = c->next;
 	}
-	desktops[desktop].current = c->next;
-	if (desktops[desktop].current == NULL) desktops[desktop].current = desktops[desktop].head;
+	if (desktops[desktop].current == c) {
+		desktops[desktop].current = c->next;
+		if (desktops[desktop].current == NULL) desktops[desktop].current = desktops[desktop].head;
+	}
 
 	free(c);
 	write_info();
-}
-
-void remove_window(Window w)
-{
-	LOG("remove win=%lu", w);
-	Client *c;
-	int desktop;
-	if (wintoclient(w, &c, &desktop)) {
-		remove_client(c, desktop);
-	}
-	XUnmapWindow(dis, w);
 }
 
 void send_kill_signal(Window w)
@@ -959,6 +966,7 @@ void update_focus()
 	for (Client *c = desktops[current_desktop].head; c != NULL; c = c->next) {
 		if (c->isfloat || c->isfull) XRaiseWindow(dis, c->win);
 	}
+	if (current != NULL && current->isfull) XRaiseWindow(dis, current->win);
 
 	/* if keyboard layout must be changed for current window, change it */
 	if (current != NULL && current->xkb_lock) XkbLockGroup(dis, XkbUseCoreKbd, current->xkb_lock_group);
