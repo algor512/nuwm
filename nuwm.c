@@ -103,13 +103,13 @@ struct Desktop{
 
 enum { MONOCLE, VSTACK, HSTACK, MODE };
 enum { WM_PROTOCOLS, WM_DELETE_WINDOW, WM_COUNT };
-enum { NET_SUPPORTED, NET_FULLSCREEN, NET_WM_STATE, NET_ACTIVE, NET_COUNT };
+enum { NET_SUPPORTED, NET_WM_CHECK, NET_FULLSCREEN, NET_WM_STATE, NET_ACTIVE, NET_COUNT };
 
 // Global variables
 static Display *dis;
 static int bool_quit;
 static int screen, sh, sw;
-static Window root;
+static Window root, wmcheckwin;
 
 static int current_desktop;
 static Desktop desktops[DESKTOPS_SIZE];
@@ -604,6 +604,7 @@ void cleanup()
 	Window *children;
 	unsigned int nchildren;
 
+	XDestroyWindow(dis, wmcheckwin);
 	XUngrabKey(dis, AnyKey, AnyModifier, root);
 	XQueryTree(dis, root, &root_return, &parent, &children, &nchildren);
 	for (int i = 0; i < nchildren; ++i) send_kill_signal(children[i]);
@@ -791,6 +792,7 @@ void setup()
 	wmatoms[WM_PROTOCOLS]     = XInternAtom(dis, "WM_PROTOCOLS", False);
 	wmatoms[WM_DELETE_WINDOW] = XInternAtom(dis, "WM_DELETE_WINDOW", False);
 	netatoms[NET_SUPPORTED]   = XInternAtom(dis, "_NET_SUPPORTED", False);
+	netatoms[NET_WM_CHECK]    = XInternAtom(dis, "_NET_SUPPORTING_WM_CHECK", False);
 	netatoms[NET_WM_STATE]    = XInternAtom(dis, "_NET_WM_STATE", False);
 	netatoms[NET_ACTIVE]      = XInternAtom(dis, "_NET_ACTIVE_WINDOW", False);
 	netatoms[NET_FULLSCREEN]  = XInternAtom(dis, "_NET_WM_STATE_FULLSCREEN", False);
@@ -798,6 +800,13 @@ void setup()
 	// propagate EWMH support
 	XChangeProperty(dis, root, netatoms[NET_SUPPORTED], XA_ATOM, 32,
 	                PropModeReplace, (unsigned char *)netatoms, NET_COUNT);
+
+	// create supporting window (for _NET_SUPPORTING_WM_CHECK)
+	wmcheckwin = XCreateSimpleWindow(dis, root, 0, 0, 1, 1, 0, 0, 0);
+	XChangeProperty(dis, wmcheckwin, netatoms[NET_WM_CHECK], XA_WINDOW, 32,
+	                PropModeReplace, (unsigned char *) &wmcheckwin, 1);
+	XChangeProperty(dis, root, netatoms[NET_WM_CHECK], XA_WINDOW, 32,
+	                PropModeReplace, (unsigned char *) &wmcheckwin, 1);
 
 	LOG("grab keys");
 	// Shortcuts
@@ -972,16 +981,19 @@ void update_focus()
 	if (current != NULL && current->xkb_lock) XkbLockGroup(dis, XkbUseCoreKbd, current->xkb_lock_group);
 }
 
-void write_info(void) {
+void write_info(void)
+{
+	char status[512] = {0};
+	int length = 0;
 	for (int i = 1; i < DESKTOPS_SIZE; ++i) {
 		int nclients = 0;
 		for (Client *c = desktops[i].head; c != NULL; c = c->next) {
 			++nclients;
 		}
-		printf("%c:%d:%d:%d%c", i == current_desktop ? '*' : '-', i,
-		       desktops[i].mode, nclients, i == DESKTOPS_SIZE - 1 ? '\n' : ' ');
+		length += snprintf(status + length, 512 - length, "%c:%d:%d:%d ",
+		                   i == current_desktop ? '*' : '-', i, desktops[i].mode, nclients);
 	}
-	fflush(stdout);
+	XStoreName(dis, root, status);
 }
 
 int xerror(Display *dpy, XErrorEvent *ee)

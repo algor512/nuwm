@@ -18,9 +18,9 @@
 
 const unsigned int ignored_modifiers[] = {LockMask, Mod2Mask, Mod3Mask, Mod5Mask};
 
-const char* runcmd[] =        { "termenu_run", NULL };
-const char* passcmd[] =       { "passman", NULL };
-const char* wificmd[] =       { "wifiman", NULL };
+const char* runcmd[] =        { "launcher", NULL };
+const char* passcmd[] =       { "passmenu", NULL };
+const char* wificmd[] =       { "wifimenu", NULL };
 const char* emacscmd[] =      { "emacsclient", "-ca", "", NULL };
 const char* termcmd[] =       { "st", NULL };
 const char* flameshotcmd[] =  { "flameshot", "gui", NULL };
