@@ -25,6 +25,12 @@ const char* emacscmd[] =      { "emacsclient", "-ca", "", NULL };
 const char* termcmd[] =       { "st", NULL };
 const char* flameshotcmd[] =  { "flameshot", "gui", NULL };
 
+const char* volume_raise_cmd[] =    { "actions", "inc-volume", NULL };
+const char* volume_lower_cmd[] =    { "actions", "dec-volume", NULL };
+const char* volume_mute_cmd[] =     { "actions", "mute", NULL };
+const char* brightness_up_cmd[] =   { "actions", "inc-bright", NULL };
+const char* brightness_dowm_cmd[] = { "actions", "dec-bright", NULL };
+
 const struct Rule rules[] = {
 	// class                 floating   fullscreen   xkb_lock     xkb_lock_group  ignore unmap
 	{ "Emacs",               0,         0,           1,           0,              0 },
@@ -37,11 +43,6 @@ const struct Rule rules[] = {
 	{ MOD|ShiftMask,   KEY,   client_to_desktop, { .i = TAG }},
 
 #define SHCMD(cmd) { .com = (const char* []){ "/bin/sh", "-c", cmd, NULL }}
-
-static const Arg volume_raise_cmd = SHCMD("dwm_actions.sh inc-volume");
-static const Arg volume_lower_cmd = SHCMD("dwm_actions.sh dec-volume");
-static const Arg brightness_up_cmd = SHCMD("dwm_actions.sh inc-bright");
-static const Arg brightness_dowm_cmd = SHCMD("dwm_actions.sh dec-bright");
 
 static struct Key keys[] = {
 	// MOD                    KEY            FUNCTION        ARGS
@@ -73,10 +74,11 @@ static struct Key keys[] = {
 	DESKTOPCHANGE(            XK_3,                          3)
 	DESKTOPCHANGE(            XK_4,                          4)
 #define DESKTOPS_SIZE 5
-	{ 0,                      XF86XK_AudioRaiseVolume,   spawn, volume_raise_cmd    },
-	{ 0,                      XF86XK_AudioLowerVolume,   spawn, volume_lower_cmd    },
-	{ 0,                      XF86XK_MonBrightnessUp,    spawn, brightness_up_cmd   },
-	{ 0,                      XF86XK_MonBrightnessDown,  spawn, brightness_dowm_cmd },
+	{ 0,                      XF86XK_AudioRaiseVolume,   spawn_script, { .com = volume_raise_cmd } },
+	{ 0,                      XF86XK_AudioLowerVolume,   spawn_script, { .com = volume_lower_cmd } },
+	{ 0,                      XF86XK_AudioMute,          spawn_script, { .com = volume_mute_cmd } },
+	{ 0,                      XF86XK_MonBrightnessUp,    spawn_script, { .com = brightness_up_cmd } },
+	{ 0,                      XF86XK_MonBrightnessDown,  spawn_script, { .com = brightness_dowm_cmd } },
 };
 
 #endif // CONFIG_H
