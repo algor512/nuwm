@@ -21,13 +21,14 @@ const unsigned int ignored_modifiers[] = {LockMask, Mod2Mask, Mod3Mask, Mod5Mask
 const char* runcmd[] =        { "launcher", NULL };
 const char* passcmd[] =       { "passmenu", NULL };
 const char* wificmd[] =       { "wifimenu", NULL };
-const char* emacscmd[] =      { "emacsclient", "-ca", "", NULL };
+const char* emacscmd[] =      { "emacs", NULL };
 const char* termcmd[] =       { "st", NULL };
-const char* flameshotcmd[] =  { "flameshot", "gui", NULL };
+const char* screenshotcmd[] = { "screenshot", NULL };
 
 const char* volume_raise_cmd[] =    { "actions", "inc-volume", NULL };
 const char* volume_lower_cmd[] =    { "actions", "dec-volume", NULL };
 const char* volume_mute_cmd[] =     { "actions", "mute", NULL };
+const char* mic_mute_cmd[] =        { "actions", "mic-mute", NULL };
 const char* brightness_up_cmd[] =   { "actions", "inc-bright", NULL };
 const char* brightness_dowm_cmd[] = { "actions", "dec-bright", NULL };
 
@@ -51,7 +52,7 @@ static struct Key keys[] = {
 	{ MOD,                    XK_n,          spawn_script,   { .com = wificmd }     },
 	{ MOD,                    XK_e,          spawn,          { .com = emacscmd }    },
 	{ MOD,                    XK_Return,     spawn,          { .com = termcmd }     },
-	{ 0,                      XK_Print,      spawn,          { .com = flameshotcmd }},
+	{ 0,                      XK_Print,      spawn_script,   { .com = screenshotcmd }},
 	{ MOD,                    XK_q,          kill_client,    { NULL }               },
 	{ MOD,                    XK_Tab,        next_win,       { NULL }               },
 	{ MOD,                    XK_f,          toggle_float,   { NULL }               },
@@ -77,6 +78,7 @@ static struct Key keys[] = {
 	{ 0,                      XF86XK_AudioRaiseVolume,   spawn_script, { .com = volume_raise_cmd } },
 	{ 0,                      XF86XK_AudioLowerVolume,   spawn_script, { .com = volume_lower_cmd } },
 	{ 0,                      XF86XK_AudioMute,          spawn_script, { .com = volume_mute_cmd } },
+	{ 0,                      XF86XK_AudioMicMute,       spawn_script, { .com = mic_mute_cmd } },
 	{ 0,                      XF86XK_MonBrightnessUp,    spawn_script, { .com = brightness_up_cmd } },
 	{ 0,                      XF86XK_MonBrightnessDown,  spawn_script, { .com = brightness_dowm_cmd } },
 };
