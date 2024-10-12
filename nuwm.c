@@ -75,7 +75,6 @@ static void quit(const Arg *);
 static void resize_master(const Arg *);
 static void smart_hjkl(const Arg *);
 static void spawn(const Arg *);
-static void spawn_script(const Arg *);
 static void swap_master(const Arg *);
 static void switch_mode(const Arg *);
 static void toggle_float(const Arg *);
@@ -103,7 +102,7 @@ struct Desktop{
 
 enum { MONOCLE, VSTACK, HSTACK, MODE };
 enum { WM_PROTOCOLS, WM_DELETE_WINDOW, WM_COUNT };
-enum { NET_SUPPORTED, NET_WM_CHECK, NET_FULLSCREEN, NET_WM_STATE, NET_ACTIVE, NET_COUNT };
+enum { NET_SUPPORTED, NET_WM_CHECK, NET_FULLSCREEN, NET_WM_STATE, NET_ACTIVE, NET_CLIENT_LIST, NET_COUNT };
 
 // Global variables
 static Display *dis;
@@ -322,31 +321,6 @@ void spawn(const Arg *arg)
 		}
 		exit(0);
 	}
-}
-
-void spawn_script(const Arg *arg)
-{
-	char *scripts_home = getenv("SCRIPTS_HOME");
-	if (scripts_home == NULL) die("SCRIPTS_HOME is NULL");
-
-	char temp_buf[1024] = {0};
-
-	strncpy(temp_buf, scripts_home, 1023);
-	strncat(temp_buf, "/", 1023);
-	strncat(temp_buf, arg->com[0], 1023);
-
-	Arg new_arg = {0};
-	int n = 0;
-	for (n = 0; arg->com[n] != NULL; ++n);
-	new_arg.com = calloc(n + 1, sizeof(*new_arg.com));
-	new_arg.com[0] = temp_buf;
-	LOG("spawn script first arg %s", temp_buf);
-	for (int i = 1; i < n; ++i) {
-		new_arg.com[i] = arg->com[i];
-		LOG("spawn script %d-th arg %s", i, arg->com[i]);
-	}
-	spawn(&new_arg);
-	free(new_arg.com);
 }
 
 void swap_master(const Arg *arg)
@@ -795,6 +769,7 @@ void setup()
 	netatoms[NET_WM_CHECK]    = XInternAtom(dis, "_NET_SUPPORTING_WM_CHECK", False);
 	netatoms[NET_WM_STATE]    = XInternAtom(dis, "_NET_WM_STATE", False);
 	netatoms[NET_ACTIVE]      = XInternAtom(dis, "_NET_ACTIVE_WINDOW", False);
+	netatoms[NET_CLIENT_LIST] = XInternAtom(dis, "_NET_CLIENT_LIST", False);
 	netatoms[NET_FULLSCREEN]  = XInternAtom(dis, "_NET_WM_STATE_FULLSCREEN", False);
 
 	// propagate EWMH support
@@ -963,10 +938,10 @@ void update_focus()
 		if (current == c) {
 			XSetWindowBorder(dis, c->win, win_focus);
 			XSetInputFocus(dis, c->win, RevertToParent, CurrentTime);
+			XChangeProperty(dis, root, netatoms[NET_ACTIVE], XA_WINDOW, 32, PropModeReplace, (unsigned char *) &(c->win), 1);
 		} else {
 			XSetWindowBorder(dis, c->win, win_unfocus);
-			XGrabButton(dis, AnyButton, AnyModifier, c->win, False,
-			            ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None);
+			XGrabButton(dis, AnyButton, AnyModifier, c->win, False, ButtonPressMask, GrabModeAsync, GrabModeAsync, None, None);
 		}
 	}
 
@@ -985,10 +960,14 @@ void write_info(void)
 {
 	char status[512] = {0};
 	int length = 0;
+
+	XDeleteProperty(dis, root, netatoms[NET_CLIENT_LIST]);
 	for (int i = 1; i < DESKTOPS_SIZE; ++i) {
 		int nclients = 0;
 		for (Client *c = desktops[i].head; c != NULL; c = c->next) {
 			++nclients;
+			XChangeProperty(dis, root, netatoms[NET_CLIENT_LIST],
+			                XA_WINDOW, 32, PropModeAppend, (unsigned char *) &(c->win), 1);
 		}
 		length += snprintf(status + length, 512 - length, "%c:%d:%d:%d ",
 		                   i == current_desktop ? '*' : '-', i, desktops[i].mode, nclients);
