@@ -31,10 +31,8 @@ const char* brightness_up_cmd[] =   { "wmactions", "inc-bright", NULL };
 const char* brightness_dowm_cmd[] = { "wmactions", "dec-bright", NULL };
 
 const struct Rule rules[] = {
-	// class                 floating   fullscreen   xkb_lock     xkb_lock_group  ignore unmap
-	{ "Emacs",               0,         0,           1,           0,              0 },
-	{ "float-term",          1,         0,           0,           0,              0 },
-	{ "7DaysToDie.x86_64",   1,         1,           0,           0,              1 }
+	// class                 floating   fullscreen   ignore unmap
+	{ "7DaysToDie.x86_64",   1,         1,           1 }
 };
 
 #define DESKTOPCHANGE(KEY, TAG)                                         \

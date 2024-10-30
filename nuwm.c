@@ -1,6 +1,6 @@
 /*
+ *  Copyright (c) 2022-2024, Alexey Gorelov
  *  Copyright (c) 2022, Vitor Figueiredo
- *  Copyright (c) 2022, Alexey Gorelov
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a
  *  copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,6 @@
 #include <X11/Xutil.h>
 #include <X11/Xproto.h>
 #include <X11/Xatom.h>
-#include <X11/XKBlib.h>
 #include <X11/XF86keysym.h>
 #include <stdio.h>
 #include <string.h>
@@ -59,8 +58,6 @@ struct Rule {
 	const char *class;
 	const int isfloat;
 	const int isfull;
-	const int xkb_lock;
-	const int xkb_lock_group;
 	const int ignore_unmaps;
 };
 
@@ -88,7 +85,6 @@ struct Client {
 	Client *next;
 	Window win;
 	int isfull, isfloat;
-	int xkb_lock, xkb_lock_group;
 	int ignore_unmaps;
 
 	int x, y, w, h; /* to save position of floating windows */
@@ -116,8 +112,6 @@ static Desktop desktops[DESKTOPS_SIZE];
 static unsigned int win_focus, win_unfocus;
 static Atom wmatoms[WM_COUNT], netatoms[NET_COUNT];
 static int (*xerrorxlib)(Display *, XErrorEvent *);
-static int xkb_group = 0;
-static int xkb_event_type = 0;
 static unsigned int ignored_modifiers_mask = 0;
 
 
@@ -129,7 +123,6 @@ static void destroynotify(XEvent *);
 static void unmapnotify(XEvent *);
 static void keypress(XEvent *);
 static void maprequest(XEvent *);
-static void xkbevent(XEvent *);
 
 static void (*events[LASTEvent])(XEvent *e) = {
 	[ClientMessage]    = clientmessage,
@@ -486,8 +479,6 @@ void maprequest(XEvent *e)
 	if (XGetClassHint(dis, c.win, &cls)) {
 		for (int i = 0; i < TABLENGTH(rules); i++) {
 			if (strstr(cls.res_class, rules[i].class) || strstr(cls.res_name, rules[i].class)) {
-				c.xkb_lock = rules[i].xkb_lock;
-				c.xkb_lock_group = rules[i].xkb_lock_group;
 				c.isfloat = rules[i].isfloat;
 				c.isfull = rules[i].isfull;
 				c.ignore_unmaps = rules[i].ignore_unmaps;
@@ -511,40 +502,6 @@ void maprequest(XEvent *e)
 
 	tile();
 	write_info();
-}
-
-void xkbevent(XEvent *e)
-{
-	XkbEvent *ev = (XkbEvent *) e;
-	Client *current = desktops[current_desktop].current;
-	if (ev->any.xkb_type == XkbStateNotify) {
-		int group = ev->state.locked_group;
-		if (current != NULL) {
-			if (!current->xkb_lock) {
-				xkb_group = group;
-			} else if (group != current->xkb_lock_group) {
-				XkbLockGroup(dis, XkbUseCoreKbd, current->xkb_lock_group);
-
-				XKeyEvent key_ev = {
-					.type = KeyPress,
-					.window = current->win,
-					.display = dis,
-					.root = root,
-					.state = 0,
-					.keycode = 250,
-				};
-
-				XSendEvent(dis, key_ev.window, False, 0, (XEvent *)&key_ev);
-				XSync(dis, False);
-
-				key_ev.type = KeyRelease;
-				XSendEvent(dis, key_ev.window, False, 0, (XEvent *)&key_ev);
-				XSync(dis, False);
-			}
-		} else {
-			xkb_group = group;
-		}
-	}
 }
 
 // Implementation of private functions
@@ -801,16 +758,6 @@ void setup()
 
 	// To catch maprequest and destroynotify (if other wm running)
 	XSelectInput(dis, root, SubstructureNotifyMask|SubstructureRedirectMask|ButtonPressMask);
-
-	/* XKB extension configuration */
-	LOG("XKB configuration");
-	XkbStateRec xkb_state;
-	if (!XkbQueryExtension(dis, NULL, &xkb_event_type, NULL, NULL, NULL)) {
-		die("can not query xkb extension");
-	}
-	XkbSelectEventDetails(dis, XkbUseCoreKbd, XkbStateNotify, XkbAllStateComponentsMask, XkbGroupStateMask);
-	XkbGetState(dis, XkbUseCoreKbd, &xkb_state);
-	xkb_group = xkb_state.locked_group;
 }
 
 void sigchld(int unused)
@@ -830,8 +777,6 @@ void start()
 		LOG("event loop iteration");
 		if (ev.type < LASTEvent && events[ev.type] != NULL) {
 			events[ev.type](&ev);
-		} else if (ev.type == xkb_event_type) {
-			xkbevent(&ev);
 		}
 	}
 }
@@ -951,9 +896,6 @@ void update_focus()
 		if (c->isfloat || c->isfull) XRaiseWindow(dis, c->win);
 	}
 	if (current != NULL && current->isfull) XRaiseWindow(dis, current->win);
-
-	/* if keyboard layout must be changed for current window, change it */
-	if (current != NULL && current->xkb_lock) XkbLockGroup(dis, XkbUseCoreKbd, current->xkb_lock_group);
 }
 
 void write_info(void)
