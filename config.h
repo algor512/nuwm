@@ -19,6 +19,7 @@
 const unsigned int ignored_modifiers[] = {LockMask, Mod2Mask, Mod3Mask, Mod5Mask};
 
 const char* runcmd[] =        { "launcher", NULL };
+const char* servicecmd[] =    { "dservice", NULL };
 const char* emacscmd[] =      { "emacs", NULL };
 const char* termcmd[] =       { "st", "/bin/fish", NULL };
 const char* screenshotcmd[] = { "screenshot", NULL };
@@ -44,6 +45,7 @@ const struct Rule rules[] = {
 static struct Key keys[] = {
 	// MOD                    KEY            FUNCTION        ARGS
 	{ MOD,                    XK_r,          spawn,          { .com = runcmd }      },
+	{ MOD,                    XK_s,          spawn,          { .com = servicecmd }  },
 	{ MOD,                    XK_e,          spawn,          { .com = emacscmd }    },
 	{ MOD,                    XK_Return,     spawn,          { .com = termcmd }     },
 	{ 0,                      XK_Print,      spawn,          { .com = screenshotcmd }},
