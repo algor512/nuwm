@@ -86,6 +86,7 @@ struct Client {
 	Window win;
 	int isfull, isfloat;
 	int ignore_unmaps;
+	int force_full;
 
 	int x, y, w, h; /* to save position of floating windows */
 };
@@ -139,6 +140,7 @@ static void copy_client(Client *, int);
 static void cleanup();
 static void die(const char *);
 static unsigned long getcolor(const char *);
+static Atom getprop(Window, Atom prop);
 static void grabkeys(void);
 static void move_resize_floating(Client *, int, int, int, int);
 static void remove_client(Client *, int);
@@ -392,6 +394,9 @@ void clientmessage(XEvent *e)
 	if (ev->message_type == netatoms[NET_WM_STATE]
 	    && ((unsigned)ev->data.l[1] == netatoms[NET_FULLSCREEN] || (unsigned)ev->data.l[2] == netatoms[NET_FULLSCREEN])) {
 		setfullscreen(c, (ev->data.l[0] == 1 || (ev->data.l[0] == 2 && !c->isfull)));
+		if (c->force_full) {
+			setfullscreen(c, 1);
+		}
 	}
 }
 
@@ -412,7 +417,7 @@ void configurerequest(XEvent *e)
 	XConfigureWindow(dis, ev->window, ev->value_mask, &wc);
 
 	Client *c;
-	if (wintoclient(ev->window, &c, NULL) && c->isfloat) {
+	if (wintoclient(ev->window, &c, NULL) && c->isfloat && !c->isfull) {
 		move_resize_floating(c, ev->x, ev->y, ev->width, ev->height);
 	}
 	XSync(dis, False);
@@ -474,6 +479,8 @@ void maprequest(XEvent *e)
 		return;
 	}
 
+	// FIXME: realise getatomprop(Client *c, Atom prop) and
+	// if getatomprop(c, netatom[NetWMState]) == NetWMFullscreen we set it to be fullscreen
 	Client c = { .win = ev->window };
 	XClassHint cls = {0, 0};
 	if (XGetClassHint(dis, c.win, &cls)) {
@@ -481,10 +488,15 @@ void maprequest(XEvent *e)
 			if (strstr(cls.res_class, rules[i].class) || strstr(cls.res_name, rules[i].class)) {
 				c.isfloat = rules[i].isfloat;
 				c.isfull = rules[i].isfull;
+				c.force_full = rules[i].isfull;
 				c.ignore_unmaps = rules[i].ignore_unmaps;
 				break;
 			}
 		}
+	}
+
+	if (getprop(c.win, netatoms[NET_WM_STATE]) == netatoms[NET_FULLSCREEN]) {
+		c.isfull = 1;
 	}
 
 	if (cls.res_class) XFree(cls.res_class);
@@ -590,6 +602,21 @@ unsigned long getcolor(const char *color)
 	if (!XAllocNamedColor(dis, map, color, &c, &c)) die("error parsing color");
 
 	return c.pixel;
+}
+
+Atom getprop(Window win, Atom prop)
+{
+	int di;
+	unsigned long dl;
+	unsigned char *p = NULL;
+	Atom da, atom = None;
+
+	if (XGetWindowProperty(dis, win, prop, 0L, sizeof(atom), False, XA_ATOM,
+		                   &da, &di, &dl, &dl, &p) == Success && p) {
+		atom = *(Atom *)p;
+		XFree(p);
+	}
+	return atom;
 }
 
 void grabkeys()

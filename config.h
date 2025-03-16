@@ -20,6 +20,7 @@ const unsigned int ignored_modifiers[] = {LockMask, Mod2Mask, Mod3Mask, Mod5Mask
 
 const char* runcmd[] =        { "launcher", NULL };
 const char* servicecmd[] =    { "dservice", NULL };
+const char* passcmd[] =       { "dpass", NULL };
 const char* emacscmd[] =      { "emacs", NULL };
 const char* termcmd[] =       { "st", "/bin/fish", NULL };
 const char* screenshotcmd[] = { "screenshot", NULL };
@@ -33,7 +34,8 @@ const char* brightness_dowm_cmd[] = { "wmactions", "dec-bright", NULL };
 
 const struct Rule rules[] = {
 	// class                 floating   fullscreen   ignore unmap
-	{ "7DaysToDie.x86_64",   1,         1,           1 }
+	{ "7DaysToDie.x86_64",   1,         1,           1 },
+	{ "pioneer",             1,         1,           0 },
 };
 
 #define DESKTOPCHANGE(KEY, TAG)                                         \
@@ -46,6 +48,7 @@ static struct Key keys[] = {
 	// MOD                    KEY            FUNCTION        ARGS
 	{ MOD,                    XK_r,          spawn,          { .com = runcmd }      },
 	{ MOD,                    XK_s,          spawn,          { .com = servicecmd }  },
+	{ MOD,                    XK_p,          spawn,          { .com = passcmd }     },
 	{ MOD,                    XK_e,          spawn,          { .com = emacscmd }    },
 	{ MOD,                    XK_Return,     spawn,          { .com = termcmd }     },
 	{ 0,                      XK_Print,      spawn,          { .com = screenshotcmd }},
