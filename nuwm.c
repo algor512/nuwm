@@ -469,7 +469,7 @@ void maprequest(XEvent *e)
 	XMapRequestEvent *ev = &e->xmaprequest;
 	LOG("maprequest win=%lu", ev->window);
 
-	XSetWindowBorderWidth(dis, ev->window, BORDER);
+	// XSetWindowBorderWidth(dis, ev->window, BORDER);
 	XMapWindow(dis, ev->window);
 
 	XWindowAttributes attrs = {0};
