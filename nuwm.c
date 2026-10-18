@@ -74,8 +74,10 @@ static void smart_hjkl(const Arg *);
 static void spawn(const Arg *);
 static void swap_master(const Arg *);
 static void switch_mode(const Arg *);
+static void toggle_bar(const Arg *);
 static void toggle_float(const Arg *);
 static void write_debug(const Arg *);
+static void shift_insert(const Arg *);
 
 #include "config.h"
 
@@ -92,8 +94,9 @@ struct Client {
 };
 
 typedef struct Desktop Desktop;
-struct Desktop{
+struct Desktop {
 	int master_size, mode;
+	int showbar;
 	Client *head, *current;
 };
 
@@ -136,6 +139,7 @@ static void (*events[LASTEvent])(XEvent *e) = {
 };
 
 // Private functions
+static int bar_height(void);
 static void copy_client(Client *, int);
 static void cleanup();
 static void die(const char *);
@@ -347,6 +351,18 @@ void switch_mode(const Arg *arg)
 	write_info();
 }
 
+void toggle_bar(const Arg *arg)
+{
+	Desktop *d = &desktops[current_desktop];
+	d->showbar = !d->showbar;
+	LOG("toggle bar: desktop=%d, showbar=%d", current_desktop, d->showbar);
+
+	for (Client *c = d->head; c != NULL; c = c->next) {
+		if (c->isfloat && !c->isfull) move_resize_floating(c, c->x, c->y, c->w, c->h);
+	}
+	tile();
+}
+
 void toggle_float(const Arg *arg)
 {
 	Client *current = desktops[current_desktop].current;
@@ -370,6 +386,28 @@ void write_debug(const Arg *unused)
 			LOG("\twindow %lu: current = %d, float = %d, next = %lu", c->win, is_cur, c->isfloat, next);
 		}
 	}
+}
+
+void shift_insert(const Arg *unused)
+{
+	if (desktops[current_desktop].current == NULL) return;
+	Client *current = desktops[current_desktop].current;
+	
+	KeyCode insert = XKeysymToKeycode(dis, XK_Insert);
+	
+	XKeyEvent ev = {
+		.type = KeyPress,
+		.window = root,
+		.display = dis,
+		.root = root,
+		.state = ShiftMask,
+		.keycode = insert,
+	};
+	XSendEvent(dis, current->win, False, 0, (XEvent *)&ev);
+	XSync(dis, False);
+	ev.type = KeyRelease;
+	XSendEvent(dis, current->win, False, 0, (XEvent *)&ev);
+	XSync(dis, False);
 }
 
 // Implementation of event handlers
@@ -517,6 +555,11 @@ void maprequest(XEvent *e)
 }
 
 // Implementation of private functions
+int bar_height(void)
+{
+	return desktops[current_desktop].showbar ? BAR : 0;
+}
+
 void copy_client(Client *c, int desktop)
 {
 	Client *new = calloc(sizeof(*c), 1);
@@ -647,10 +690,11 @@ void grabkeys()
 
 void move_resize_floating(Client *c, int x, int y, int w, int h)
 {
+	int bh = bar_height();
 	w = MAX(10, MIN(w, sw - 2*BORDER));
-	h = MAX(10, MIN(h, sh - 2*BORDER - BAR));
+	h = MAX(10, MIN(h, sh - 2*BORDER - bh));
 	x = MAX(0, x);
-	y = MAX(BAR, y);
+	y = MAX(bh, y);
 
 	int corner_x = x + w + 2*BORDER;
 	int corner_y = y + h + 2*BORDER;
@@ -775,6 +819,7 @@ void setup()
 	for (int i = 0; i < DESKTOPS_SIZE; ++i) {
 		desktops[i].master_size = MASTER_SIZE;
 		desktops[i].mode = MONOCLE;
+		desktops[i].showbar = 1;
 		desktops[i].head = NULL;
 		desktops[i].current = NULL;
 	}
@@ -836,9 +881,10 @@ void tile()
 	}
 
 	int w, h, x, y, ms;
+	int bh = bar_height();
 	if (stack_size == 0) {
 		XSetWindowBorderWidth(dis, master->win, 0);
-		XMoveResizeWindow(dis, master->win, 0, BAR, sw, sh - BAR);
+		XMoveResizeWindow(dis, master->win, 0, bh, sw, sh - bh);
 	} else {
 		switch (desktops[current_desktop].mode) {
 		case VSTACK:
@@ -846,14 +892,14 @@ void tile()
 
 			// Master window
 			w = ms - 2*BORDER;
-			h = sh - 2*BORDER - BAR;
+			h = sh - 2*BORDER - bh;
 			XSetWindowBorderWidth(dis, master->win, BORDER);
-			XMoveResizeWindow(dis, master->win, 0, BAR, w, h);
+			XMoveResizeWindow(dis, master->win, 0, bh, w, h);
 
 			x = ms + 2*BORDER + GAP;
-			y = BAR;
+			y = bh;
 			w = sw - ms - 4*BORDER - GAP;
-			h = (sh - 2*stack_size*BORDER - (stack_size - 1)*GAP - BAR) / stack_size;
+			h = (sh - 2*stack_size*BORDER - (stack_size - 1)*GAP - bh) / stack_size;
 			for (Client *c = master->next; c != NULL; c = c->next) {
 				if (c->isfloat) continue;
 				XSetWindowBorderWidth(dis, c->win, BORDER);
@@ -862,21 +908,21 @@ void tile()
 			}
 			break;
 		case HSTACK:
-			ms = desktops[current_desktop].master_size * (sh - BAR - 2*BORDER - GAP) / 100;
+			ms = desktops[current_desktop].master_size * (sh - bh - 2*BORDER - GAP) / 100;
 
 			// Master window
 			w = sw - 2*BORDER;
 			h = ms - 2*BORDER;
 			XSetWindowBorderWidth(dis, master->win, BORDER);
-			XMoveResizeWindow(dis, master->win, 0, BAR, w, h);
+			XMoveResizeWindow(dis, master->win, 0, bh, w, h);
 
 			x = 0;
-			h = sh - ms - 4*BORDER - GAP - BAR;
+			h = sh - ms - 4*BORDER - GAP - bh;
 			w = (sw - 2*stack_size*BORDER - (stack_size - 1)*GAP) / stack_size;
 			for (Client *c = master->next; c != NULL; c = c->next) {
 				if (c->isfloat) continue;
 				XSetWindowBorderWidth(dis, c->win, BORDER);
-				XMoveResizeWindow(dis, c->win, x, GAP + BAR + ms, w, h);
+				XMoveResizeWindow(dis, c->win, x, GAP + bh + ms, w, h);
 				x += w + 2*BORDER + GAP;
 			}
 
@@ -884,12 +930,12 @@ void tile()
 		case MONOCLE:
 			if (current != NULL && !current->isfloat) {
 				XSetWindowBorderWidth(dis, current->win, 0);
-				XMoveResizeWindow(dis, current->win, 0, BAR, sw, sh - BAR);
+				XMoveResizeWindow(dis, current->win, 0, bh, sw, sh - bh);
 			}
 			for (Client *c = master; c != NULL; c = c->next) {
 				if (c->isfloat) continue;
 				XSetWindowBorderWidth(dis, c->win, 0);
-				XMoveResizeWindow(dis, c->win, 0, BAR, sw, sh - BAR);
+				XMoveResizeWindow(dis, c->win, 0, bh, sw, sh - bh);
 			}
 			break;
 		default:
@@ -918,6 +964,11 @@ void update_focus()
 	}
 
 	/* reorder windows */
+	if (!desktops[current_desktop].showbar) {
+		for (Client *c = desktops[current_desktop].head; c != NULL; c = c->next) {
+			if (!c->isfloat) XRaiseWindow(dis, c->win);
+		}
+	}
 	if (current != NULL) XRaiseWindow(dis, current->win);
 	for (Client *c = desktops[current_desktop].head; c != NULL; c = c->next) {
 		if (c->isfloat || c->isfull) XRaiseWindow(dis, c->win);

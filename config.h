@@ -35,6 +35,8 @@ const char* brightness_dowm_cmd[] = { "wmactions", "dec-bright", NULL };
 const struct Rule rules[] = {
 	// class                 floating   fullscreen   ignore unmap
 	{ "7DaysToDie.x86_64",   1,         1,           1 },
+	{ "steam_app_default",   1,         1,           1 },
+	{ "steam_app_34330",     1,         1,           1 },
 	{ "pioneer",             1,         1,           0 },
 };
 
@@ -55,8 +57,10 @@ static struct Key keys[] = {
 	{ MOD,                    XK_q,          kill_client,    { NULL }               },
 	{ MOD,                    XK_Tab,        next_win,       { NULL }               },
 	{ MOD,                    XK_f,          toggle_float,   { NULL }               },
+	{ MOD,                    XK_b,          toggle_bar,     { NULL }               },
 	{ MOD,                    XK_space,      swap_master,    { NULL }               },
 	{ MOD,                    XK_comma,      switch_mode,    { NULL }               },
+	{ 0,                      XK_Insert,     shift_insert,   { NULL }               },
 
 	{ MOD,                    XK_h,          smart_hjkl,     { .i = XK_h }          },
 	{ MOD,                    XK_j,          smart_hjkl,     { .i = XK_j }          },
@@ -73,6 +77,11 @@ static struct Key keys[] = {
 	DESKTOPCHANGE(            XK_2,                          2)
 	DESKTOPCHANGE(            XK_3,                          3)
 	DESKTOPCHANGE(            XK_4,                          4)
+	DESKTOPCHANGE(            XK_5,                          5)
+	DESKTOPCHANGE(            XK_6,                          6)
+	DESKTOPCHANGE(            XK_7,                          7)
+	DESKTOPCHANGE(            XK_8,                          8)
+	DESKTOPCHANGE(            XK_9,                          9)
 #define DESKTOPS_SIZE 10
 	{ 0,                      XF86XK_AudioRaiseVolume,   spawn, { .com = volume_raise_cmd }    },
 	{ 0,                      XF86XK_AudioLowerVolume,   spawn, { .com = volume_lower_cmd }    },
